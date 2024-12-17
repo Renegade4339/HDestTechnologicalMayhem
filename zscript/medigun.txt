@@ -624,7 +624,7 @@ class MedigunBeam : HDActor
 			if(hd_debug>=7&&(blues>0||zerk>0||operated))console.printf("Deploying Übercharge to "..tracer);
 			else if(hd_debug>=7)console.printf("Attacking "..tracer);
 			if(!(blues>0||zerk>0||operated))
-			tracer.damagemobj(self,target,random(2,8),"Balefire",DMG_NO_PROTECT);
+			tracer.damagemobj(self,target,random(6,8),"Balefire",DMG_NO_PROTECT);
 			destroy();
 			}else{
 			int tracermaxhp=tracer.spawnhealth()*1.5;
