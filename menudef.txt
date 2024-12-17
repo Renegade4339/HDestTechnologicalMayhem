@@ -1,0 +1,15 @@
+OptionValue "DORKModes"{
+	1, "$HDOPTIONVALUE_DORKMODE_IDLE"
+	2, "$HDOPTIONVALUE_DORKMODE_WATCH"
+	3, "$HDOPTIONVALUE_DORKMODE_TURRET"
+	4, "$HDOPTIONVALUE_DORKMODE_PATROL"
+}
+
+AddOptionMenu "HDAddonMenu"
+{
+	StaticText " "
+	StaticText " "
+	Option "$HDOPTIONS_DORKMODE","dk_dorkmode","DORKModes"
+	StaticText " "
+	StaticText " "
+}

@@ -1,0 +1,18 @@
+version "4.10"
+
+#include "zscript/medigun_medipack.txt"
+#include "zscript/medigun.txt"
+
+#include "zscript/m642_ammopack.txt"
+#include "zscript/m642_gun.txt"
+
+#include "zscript/rain.txt"
+
+#include "zscript/rifc.txt"
+
+#include "zscript/dork.txt"
+#include "zscript/dork_cmdthingy.txt"
+
+#include "zscript/ectd.txt"
+
+#include "zscript/tm_handler.txt"

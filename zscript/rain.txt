@@ -1,0 +1,898 @@
+// ------------------------------------------------------------
+// R.A.I.N System
+// ------------------------------------------------------------
+
+class RAINSystem:HDUPK{
+	int battery1;
+	int battery2;
+	bool isdestroyed;
+	bool isworn;
+	default{
+		//$Category "Monsters/Hideous Destructor"
+		//$Title "R.A.I.N. System"
+		//$Sprite "RAINA0"
+
+		+ismonster +noblockmonst +shootable //+dontthrust
+		+friendly +nofear +dontgib +noblood +ghost
+		+nobouncesound
+		damagefactor "hot",1.2;
+		damagefactor "cold",1.2;
+		radius 8;height 32;deathheight 32;
+		bloodcolor "22 22 22";
+		health 200;gibhealth 600;mass 300;
+		hdupk.pickupsound "derp/crawl";
+		hdupk.pickupmessage ""; //let the pickup do this
+		obituary "$OB_RAIN";
+		tag "$TAG_RAIN";
+	}
+	override bool cancollidewith(actor other,bool passive){return other.bmissile||HDPickerUpper(other)||DERPBot(other);}
+
+	override bool OnGrab(actor grabber){
+		if(isdestroyed)return false;
+		return true;
+	}
+
+	override void beginplay(){
+		super.beginplay();
+		battery1=20;
+		battery2=20;
+	}
+
+	int cooldown;
+	override void tick(){
+
+		string flash = "HDFlashbangThrown";
+		class<HDFragGrenade> flashbang = flash;
+		string flashroller = "HDFlashbangRoller";
+		class<HDFragGrenadeRoller> flashbangroller = flashroller;
+
+		string gas = "HDGasGrenadeThrown";
+		class<HDFragGrenade> stinky = gas;
+		string gasroller = "HDGasGrenadeRoller";
+		class<HDFragGrenadeRoller> stinkyroller = gasroller;
+
+		string dok = "MedigunBeam";
+		class<HDActor> tor = dok;
+
+		super.tick();
+		if(isfrozen()||health<1||battery2<1)return;
+		if(battery2>0&&!random(0,2048))battery2--;
+		if(cooldown>0){cooldown--;return;}
+		if(tracer)A_FaceTracer(1,1);
+		ThinkerIterator Threats = ThinkerIterator.Create("Actor");
+		Actor threat;
+		while (threat = Actor(Threats.Next())){
+			let fucky=HDFragGrenade(threat);
+			let wucky=HDFragGrenadeRoller(threat);
+			let uwu=HDFragGrenade(tracer);
+			let owo=HDFragGrenadeRoller(tracer);
+			if(tracer){
+				if(
+					distance3d(tracer)>1792
+					||!CheckSight(tracer, SF_IGNOREVISIBILITY)
+					||tracer.InStateSequence(tracer.CurState, tracer.ResolveState("death"))
+					||tracer.findinventory("DoNotTargetByTheRAIN")
+					||(uwu&&uwu.fuze>=999)
+					||(owo&&owo.fuze>=999)
+					||tracer.findinventory("RAINDangerClose")
+				)tracer=null;
+				else continue;
+			}
+			if(
+				threat.bmissile
+				&&(distance3d(threat)<1792)
+				&&CheckSight(threat, SF_IGNOREVISIBILITY)
+				&&!(threat is 'HDBulletActor')
+				&&!(threat is 'HDUPK')
+				&&!threat.findinventory("DoNotTargetByTheRAIN")
+				&&!threat.findinventory("RAINDangerClose")
+				&&!(threat is tor)
+				&&!threat.InStateSequence(threat.CurState, threat.ResolveState("death"))
+				&&!threat.InStateSequence(threat.CurState, threat.ResolveState("death2"))
+				&&!threat.InStateSequence(threat.CurState, threat.ResolveState("splat"))
+				&&!threat.InStateSequence(threat.CurState, threat.ResolveState("burn"))
+			){
+				tracer=threat;
+				if((threat.getAge()<=3)&&(distance3d(threat)<384))threat.giveinventory("RAINDangerClose",1);
+				cooldown=random(1,3);
+			}
+		}
+			if(tracer&&distance3d(tracer)<512&&battery1>0&&cooldown<1&&!tracer.findinventory("RAINDangerClose")){
+				//if(A_JumpIfTargetInLOS("null",1,JLOSF_DEADNOJUMP)){
+				if(isworn||GetAngle(GAF_RELATIVE,AAPTR_TRACER)<10){
+					spawn("CountermeasureMissile",tracer.pos,ALLOW_REPLACE);
+					tracer.giveinventory("DoNotTargetByTheRAIN",1);
+					let grenade=HDFragGrenade(tracer);
+					let roller=HDFragGrenadeRoller(tracer);
+					let slowprojectile=SlowProjectile(tracer);
+					if((stinky&&stinkyroller)&&((tracer is stinky)||(tracer is stinkyroller))){
+						let gr=spawn("explosionsimulator",tracer.pos,ALLOW_REPLACE);
+						gr.target=tracer.target;gr.master=tracer.master;
+						tracer.setorigin((99999,99999,0),false); //DO NOT.
+						tracer.destroy();
+					}else{
+						if(grenade)grenade.fuze=999;
+						if(roller)roller.fuze=999;
+						if((flashbang&&flashbangroller)&&((tracer is flashbang)||(tracer is flashbangroller))){
+							let gr=spawn("explosionsimulator",tracer.pos,ALLOW_REPLACE);
+							gr.target=tracer.target;gr.master=tracer.master;gr.stamina=1;
+						}
+					}
+					if(SlowProjectile)SlowProjectile.primed=true;
+					if(SlowProjectile)SlowProjectile.ExplodeSlowMissile();
+					else tracer.ExplodeMissile();
+					A_StartSound("weapons/plasidle",CHAN_WEAPON,CHANF_OVERLAP);
+					if(battery2>0&&!random(0,1024))battery2--;
+					if(battery1>0&&!random(0,128))battery1--;
+					cooldown=18;
+				}
+			}
+	}
+
+	override int damagemobj(
+		actor inflictor,actor source,int damage,
+		name mod,int flags,double angle
+	){
+		if(
+			!!source
+			&&(
+				!inflictor
+				||source==inflictor
+			)
+			&&source.health>0
+			&&source.bismonster
+			&&source.bcanusewalls
+			&&(
+				source.instatesequence(source.curstate,source.resolvestate("melee"))
+				||source.instatesequence(source.curstate,source.resolvestate("meleekick"))
+			)
+		){
+			target=source;
+			setz(target.pos.z+target.height*0.7);
+			setstatelabel("give");
+			return -1;
+		}
+		return super.damagemobj(inflictor,source,damage,mod,flags,angle);
+	}
+	states{
+	give:
+		RAIN C 0{
+				A_StartSound("weapons/rifleclick2",CHAN_AUTO);
+			let ddd=RAINUsable(spawn("RAINUsable",pos));
+			if(ddd){
+				ddd.weaponstatus[RAINS_WEAPON]=battery1;
+				ddd.weaponstatus[RAINS_RADAR]=battery2;
+				if(health<1)ddd.weaponstatus[0]|=RAINF_BROKEN;
+				ddd.translation=self.translation;
+				grabthinker.grab(target,ddd);
+			}
+			destroy();
+			return;
+		}goto spawn;
+	spawn:
+		RAIN A 0;
+	idle:
+		RAIN # 1{
+			if(battery2<1){setstatelabel("dead");return;}
+			if(health<75)frame=1;
+			else frame=0;
+		}
+		loop;
+	death:
+		RAIN B 0{
+			A_StartSound("weapons/bigcrack",CHAN_VOICE);
+			A_SpawnItemEx("HDSmoke",0,0,1, vel.x,vel.y,vel.z+1, 0,SXF_NOCHECKPOSITION|SXF_ABSOLUTEMOMENTUM);
+			A_SpawnChunks("BigWallChunk",12);
+		}
+	dead:
+	death.spawndead:
+		RAIN C -1;
+	xdeath:
+		RAIN B 0{
+		doordestroyer.destroydoor(self,42,frandom(3,16));
+		isdestroyed=true;
+
+		//explosion
+			A_GiveInventory("Heat",1000);
+			A_SprayDecal("Scorch",16);
+			A_HDBlast(
+				pushradius:256,pushamount:128,fullpushradius:96,
+				fragradius:HDCONST_ONEMETRE*(10+0.2*stamina),fragtype:"HDB_frag",
+				immolateradius:128,immolateamount:random(3,60),
+				immolatechance:25
+			);
+			actor xpl=spawn("Gyrosploder",pos-(0,0,1),ALLOW_REPLACE);
+			xpl.target=target;xpl.master=master;xpl.stamina=stamina;
+			distantnoise.make(self,"world/rocketfar");
+		A_SpawnChunksFrags("HDB_frag",180,0.8+0.05*stamina);
+		}
+	xdead:
+		RAIN D -1;
+	}
+}
+
+
+
+//usable has separate actors to preserve my own sanity
+class RAINUsable:HDWeapon{
+	default{
+		//$Category "Items/Hideous Destructor"
+		//$Title "R.A.I.N System (Pickup)"
+		//$Sprite "RAINC0"
+
+		+weapon.wimpy_weapon
+		+inventory.invbar
+		+hdweapon.droptranslation
+		+hdweapon.fitsinbackpack
+		hdweapon.barrelsize 0,0,0;
+		weapon.selectionorder 1014;
+
+		radius 8;height 32;deathheight 32;
+		inventory.icon "RAINA0";
+		inventory.pickupmessage "$PICKUP_RAIN";
+		translation 0;
+		tag "$TAG_RAIN";
+		hdweapon.refid "rai";
+	}
+	override bool AddSpareWeapon(actor newowner){return AddSpareWeaponRegular(newowner);}
+	override hdweapon GetSpareWeapon(actor newowner,bool reverse,bool doselect){return GetSpareWeaponRegular(newowner,reverse,doselect);}
+	override int getsbarnum(int flags){
+		let ssbb=HDStatusBar(statusbar);
+		if(ssbb&&weaponstatus[0]&DERPF_BROKEN)ssbb.savedcolour=Font.CR_DARKGRAY;
+		return amount;
+	}
+	override void InitializeWepStats(bool idfa){
+		weaponstatus[RAINS_WEAPON]=20;
+		weaponstatus[RAINS_RADAR]=20;
+		if(idfa)weaponstatus[0]&=~RAINF_BROKEN;
+	}
+	override double gunmass(){
+		return 14+(weaponstatus[RAINS_WEAPON]>=0?2:0)+(weaponstatus[RAINS_RADAR]>=0?2:0);
+	}
+	override double weaponbulk(){
+		return 100+(weaponstatus[RAINS_WEAPON]>=0?ENC_BATTERY_LOADED:0)+(weaponstatus[RAINS_RADAR]>=0?ENC_BATTERY_LOADED:0);
+	}
+	override string pickupmessage(){
+		string msg=super.pickupmessage();
+		if(weaponstatus[0]&RAINF_BROKEN)return msg..Stringtable.Localize("$PICKUP_RAIN_BROKEN");
+		return msg;
+	}
+	override void detachfromowner(){
+		translation=owner.translation;
+		super.detachfromowner();
+	}
+	override void DrawHUDStuff(HDStatusBar sb,HDWeapon hdw,HDPlayerPawn hpl){
+		int ofs=weaponstatus[RAINS_USEOFFS];
+		if(ofs>90)return;
+		let ddd=RAINUsable(owner.findinventory("RAINUsable"));
+		if(!ddd||ddd.amount<1)return;
+		let pmags=HDBattery(owner.findinventory("HDBattery"));
+
+		vector2 bob=hpl.wepbob*0.2;
+		bob.y+=ofs;
+		sb.drawimage("RAINC0",(0,22)+bob,
+			sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER|sb.DI_TRANSLATABLE,
+			alpha:!!pmags?1.:0.6,scale:(2,2)
+		);
+
+		if(ofs>30)return;
+
+		string mode;
+		if(hdw.weaponstatus[0]&RAINF_BROKEN)mode=Stringtable.Localize("$RAIN_BROKEN");
+		sb.drawstring(
+			sb.psmallfont,mode,(0,34)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+
+	if(weaponstatus[RAINS_RADAR]<0)mode=Stringtable.Localize("$RAIN_NOPOWER");
+		else mode=Stringtable.Localize("$RAIN_RADARPOWER")..weaponstatus[RAINS_RADAR];
+		sb.drawstring(
+			sb.psmallfont,mode,(0,44)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+		if(weaponstatus[RAINS_WEAPON]<0)mode=Stringtable.Localize("$RAIN_NOWEAPONPOWER");
+		else mode=Stringtable.Localize("$RAIN_WEAPONPOWER")..weaponstatus[RAINS_WEAPON];
+		sb.drawstring(
+			sb.psmallfont,mode,(0,54)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+
+
+		if(sb.hudlevel==1){
+		sb.drawbattery(-54,-4,sb.DI_SCREEN_CENTER_BOTTOM,reloadorder:true);
+			sb.drawnum(hpl.countinv("HDBattery"),-46,-8,sb.DI_SCREEN_CENTER_BOTTOM);
+		}
+			int bffb=hdw.weaponstatus[RAINS_WEAPON];
+		if(bffb>0)sb.drawwepnum(bffb,20,posy:-10);
+		else if(!bffb)sb.drawstring(
+			sb.mamountfont,"000000",
+			(-16,-14),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+		bffb=hdw.weaponstatus[RAINS_RADAR];
+		if(bffb>0)sb.drawwepnum(bffb,20);
+		else if(!bffb)sb.drawstring(
+
+			sb.mamountfont,"000000",
+			(-16,-7),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+	}
+	override string gethelptext(){
+		return
+		((weaponstatus[0]&RAINF_BROKEN)?
+		(WEPHELP_FIRE.."+"..WEPHELP_RELOAD.."  Repair\n"):(WEPHELP_FIRE.."  Deploy\n"))
+		..WEPHELP_RELOAD.."  Reload weapon battery\n"
+		..WEPHELP_UNLOAD.."  Unload weapon battery\n"
+		..WEPHELP_ALTRELOAD.."  Reload main battery\n"
+		..WEPHELP_USE.."+"..WEPHELP_ALTRELOAD.."  Unload main battery\n"
+		..((weaponstatus[0]&RAINF_BROKEN)?
+		(" "):(WEPHELP_ZOOM.." + "..WEPHELP_FIRE.."  Wear"))
+		;
+	}
+	action void A_AddOffset(int ofs){
+		invoker.weaponstatus[RAINS_USEOFFS]+=ofs;
+	}
+
+
+	static int backpackrepairs(actor owner,hdbackpack bp){
+		if(!owner||!bp)return 0;
+		StorageItem si=bp.Storage.Find('rainusable');
+		int fixbonus=0;
+		if (si){
+			// [Ace] The original implementation had a bug (?) where if you had two DERPS and the first one was destroyed for parts, the second one would be skipped.
+			// Same thing with the H.E.R.P.
+			for(int i=0;si.Amounts.Size()>0&&i<si.Amounts[0];){
+				if (si.WeaponStatus[HDWEP_STATUSSLOTS*i]&DERPF_BROKEN){
+					if (!random(0,6-fixbonus)){
+						//fix
+						si.WeaponStatus[HDWEP_STATUSSLOTS*i]&=~RAINF_BROKEN;
+						if (fixbonus>0)fixbonus--;
+						owner.A_Log(Stringtable.Localize("$RAIN_REPAIRPACK"),true);
+					}else if(!random(0,6)){
+						fixbonus++;
+						//delete and restart
+						bp.Storage.RemoveItem(si,null,null,index:i);
+						i=0;
+						owner.A_Log(Stringtable.Localize("$RAIN_REPAIRPACK_FAIL"),true);
+						continue;
+					}
+				}
+				i++;
+			}
+		}
+		return fixbonus;
+	}
+	override void consolidate(){
+		if(!owner)return;
+		int fixbonus=backpackrepairs(owner,hdbackpack(owner.FindInventory("HDBackpack",true)));
+		let spw=spareweapons(owner.findinventory("spareweapons"));
+		if(spw){
+			for(int i=0;i<spw.weapontype.size();i++){
+				if(spw.weapontype[i]!=getclassname())continue;
+				array<string>wpst;wpst.clear();
+				spw.weaponstatus[i].split(wpst,",");
+				int wpstint=wpst[0].toint();
+				if(
+					wpstint&RAINF_BROKEN
+				){
+					if(!random(0,max(0,6-fixbonus))){
+						if(fixbonus>0)fixbonus--;
+						wpstint&=~DERPF_BROKEN;
+						owner.A_Log(Stringtable.Localize("$RAIN_REPAIR"),true);
+						string newwepstat=spw.weaponstatus[i];
+						newwepstat=wpstint..newwepstat.mid(newwepstat.indexof(","));
+						spw.weaponstatus[i]=newwepstat;
+					}else if(!random(0,6)){
+						//delete
+						fixbonus++;
+						spw.weaponbulk.delete(i);
+						spw.weapontype.delete(i);
+						spw.weaponstatus.delete(i);
+						owner.A_Log(Stringtable.Localize("$RAIN_REPAIR_FAIL"),true);
+						//go back to start
+						i=0;
+						continue;
+					}
+				}
+			}
+		}
+		if(
+			(weaponstatus[0]&RAINF_BROKEN)
+			&&!random(0,7-fixbonus)
+		){
+			weaponstatus[0]&=~RAINF_BROKEN;
+			owner.A_Log(Stringtable.Localize("$RAIN_FIELDREPAIR"),true);
+		}
+	}
+	override void ForceBasicAmmo(){
+		owner.A_TakeInventory("HDBattery");
+		owner.A_GiveInventory("HDBattery",2);
+	}
+
+	override void doeffect(){
+		if(cooldown>0)cooldown--;
+		super.doeffect();
+	}
+	int cooldown;
+	action void A_WearRAIN(){
+		bool helptext=HDWeapon.CheckDoHelpText(self);
+
+		invoker.wornlayer=STRIP_BACKPACK;
+		bool intervening=!HDPlayerPawn.CheckStrip(self,invoker,false);
+		invoker.wornlayer=0;
+
+		if(intervening){
+
+			//check if it's ONLY the backpack layer that's in the way
+			invoker.wornlayer=STRIP_BACKPACK+1;
+			bool notarmour=!HDPlayerPawn.CheckStrip(self,invoker,false);
+			invoker.wornlayer=0;
+
+			if(
+				notarmour
+				||invoker.cooldown>0
+			){
+				HDPlayerPawn.CheckStrip(self,self);
+			}else invoker.cooldown=10;
+			return;
+		}
+
+		//and finally put on the actual armour
+		HDArmour.ArmourChangeEffect(self,100);
+		A_GiveInventory("HDRAINWorn");
+		let worn=HDRAINWorn(FindInventory("HDRAINWorn"));
+		worn.battery1=invoker.weaponstatus[RAINS_WEAPON];
+		worn.battery2=invoker.weaponstatus[RAINS_RADAR];
+		invoker.amount--;
+
+		invoker.WearPackHelpText(self);
+	}
+
+	void WearPackHelpText(actor wearer){
+		if(!HDWeapon.CheckDoHelpText(wearer))return;
+		wearer.A_Log(
+			Stringtable.Localize("$RAIN_PUTON")
+		,true);
+	}
+
+	states{
+	spawn:
+		RAIN C -1;
+		stop;
+	select:
+		TNT1 A 0 A_AddOffset(100);
+		goto super::select;
+
+
+	ready:
+		TNT1 A 1{
+			if(pressinguser3()){
+				A_MagManager("HDBattery");
+				return;
+			}
+			int iofs=invoker.weaponstatus[RAINS_USEOFFS];
+			if(iofs>0)invoker.weaponstatus[RAINS_USEOFFS]=iofs*2/3;
+			if(pressingfire()){
+				setweaponstate("deploy");
+				return;
+			}
+			A_WeaponReady(WRF_NOFIRE|WRF_ALLOWRELOAD|WRF_ALLOWUSER1|WRF_ALLOWUSER4);
+		}goto readyend;
+	deploy:
+		TNT1 AA 1 A_AddOffset(4);
+		TNT1 AAAA 1 A_AddOffset(9);
+		TNT1 AAAA 1 A_AddOffset(20);
+		TNT1 A 0 A_JumpIf(!pressingfire(),"ready");
+		TNT1 A 4 A_StartSound("weapons/pismagclick",CHAN_WEAPON);
+		TNT1 A 2;
+		TNT1 A 1{
+			if(invoker.weaponstatus[0]&RAINF_BROKEN){
+				setweaponstate("readytorepair");
+				return;
+			}
+		}
+		TNT1 A 0{
+			if(invoker.weaponstatus[RAINS_RADAR]<1){
+				A_Log(Stringtable.Localize("$RAIN_NOMAINPOWER"),true);
+				setweaponstate("nope");
+				return;
+			}
+			
+			if(pressingzoom())A_WearRAIN();
+			else{
+			actor a;int b;
+			[b,a]=A_SpawnItemEx("RAINSystem",12,0,gunheight()-4,
+				cos(pitch)*6,0,-sin(pitch)*6,0,
+				SXF_NOCHECKPOSITION|SXF_TRANSFERPOINTERS|
+				SXF_SETMASTER|SXF_TRANSFERTRANSLATION|SXF_SETTARGET
+			);
+			let rain=rainsystem(a);
+			rain.vel+=vel;
+			rain.battery1=invoker.weaponstatus[RAINS_WEAPON];
+			rain.battery2=invoker.weaponstatus[RAINS_RADAR];
+
+			hdweaponselector.select(self,"HDFist",0);
+			}
+		}
+		goto nope;
+	unload:
+		TNT1 A 6 A_JumpIf(invoker.weaponstatus[RAINS_WEAPON]<0,"nope");
+		TNT1 A 3 A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+		TNT1 A 0{
+			int ammount=invoker.weaponstatus[RAINS_WEAPON];
+			if(pressingunload())HDMagAmmo.GiveMag(self,"HDBattery",ammount);
+			else{
+				HDMagAmmo.SpawnMag(self,"HDBattery",ammount);
+				setweaponstate("nope");
+			}
+			invoker.weaponstatus[RAINS_WEAPON]=-1;
+		}
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		goto nope;
+	reload:
+		TNT1 A 0 A_JumpIf(invoker.weaponstatus[RAINS_WEAPON]>=0,"nope");
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		TNT1 A 10 A_JumpIf(HDMagAmmo.NothingLoaded(self,"HDBattery"),"nope");
+		TNT1 A 6{
+			A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+			invoker.weaponstatus[RAINS_WEAPON]=HDMagAmmo(findinventory("HDBattery")).TakeMag(true);
+		}
+		goto nope;
+	altunload:
+		TNT1 A 6 A_JumpIf(invoker.weaponstatus[RAINS_RADAR]<0,"nope");
+		TNT1 A 3 A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+		TNT1 A 0{
+			int ammount=invoker.weaponstatus[RAINS_RADAR];
+			if(pressinguse())HDMagAmmo.GiveMag(self,"HDBattery",ammount);
+			else{
+				HDMagAmmo.SpawnMag(self,"HDBattery",ammount);
+				setweaponstate("nope");
+			}
+			invoker.weaponstatus[RAINS_RADAR]=-1;
+		}
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		goto nope;
+	user1:
+	altreload:
+		TNT1 A 0 A_JumpIf(pressinguse(),"altunload");
+		TNT1 A 0 A_JumpIf(invoker.weaponstatus[RAINS_RADAR]>=0,"nope");
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		TNT1 A 10 A_JumpIf(HDMagAmmo.NothingLoaded(self,"HDBattery"),"nope");
+		TNT1 A 6{
+			A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+			invoker.weaponstatus[RAINS_RADAR]=HDMagAmmo(findinventory("HDBattery")).TakeMag(true);
+		}
+		goto nope;
+
+
+	readytorepair:
+		TNT1 A 1{
+			if(!pressingfire())setweaponstate("nope");
+			else if(justpressed(BT_RELOAD)){
+				if((invoker.weaponstatus[RAINS_WEAPON]>=0)||(invoker.weaponstatus[RAINS_RADAR]>=0)){
+					A_Log(Stringtable.Localize("$RAIN_REMOVEMAG"),true);
+				}else setweaponstate("repairbash");
+			}
+		}
+		wait;
+	repairbash:
+		TNT1 A 5{
+			int failchance=40;
+			int spareindex=-1;
+			//find spares, whether to cannibalize or copy
+			let spw=spareweapons(findinventory("spareweapons"));
+			if(spw){
+				for(int i=0;i<spw.weapontype.size();i++){
+					if(
+						spw.weapontype[i]==getclassname()
+						&&spw.GetWeaponValue(i,0)&RAINF_BROKEN
+					){
+						if(spareindex==-1)spareindex=i;
+						failchance=min(10,failchance-7);
+						break;
+					}
+				}
+			}
+			if(!random(0,failchance)){
+				invoker.weaponstatus[0]&=~DERPF_BROKEN;
+				A_SetHelpText();
+				A_StartSound("derp/repair",CHAN_WEAPON);
+				A_Log(Stringtable.Localize("$RAIN_REPAIRED"),true);
+				//destroy one spare
+				if(
+					spareindex>=0
+					&&!random(0,2)
+				){
+					spw.weaponbulk.delete(spareindex);
+					spw.weapontype.delete(spareindex);
+					spw.weaponstatus.delete(spareindex);
+					A_Log(Stringtable.Localize("$RAIN_CANNIBALIZED"),true);
+				}
+			}else A_StartSound("derp/repairtry",CHAN_WEAPONBODY,CHANF_OVERLAP,
+				volume:frandom(0.6,1.),pitch:frandom(1.2,1.4)
+			);
+			A_MuzzleClimb(
+				frandom(-1.,1.),frandom(-1.,1.),
+				frandom(-1.,1.),frandom(-1.,1.),
+				frandom(-1.,1.),frandom(-1.,1.),
+				frandom(-1.,1.),frandom(0.,1.)
+			);
+		}
+		TNT1 A 0 A_JumpIf(!(invoker.weaponstatus[0]&RAINF_BROKEN),"nope");
+		goto readytorepair;
+	}
+}
+enum DorcConst{
+	RAINS_USEOFFS=2,
+	RAINS_WEAPON=3,
+	RAINS_RADAR=6,
+
+	RAINF_BROKEN=1,
+}
+
+class HDRAINWorn:HDWeapon{
+	default{
+		tag "$TAG_RAIN";
+		HDWeapon.wornlayer STRIP_BACKPACK;
+		Inventory.icon "RAINA0";
+		-hdweapon.fitsinbackpack
+		+weapon.no_auto_switch
+	}
+
+		int battery1;
+		int battery2;
+
+		bool damaged;
+		bool destroyed;
+
+		RAINSystem rain;
+	override bool IsBeingWorn() { return true; }
+
+	override double weaponbulk(){
+		return 100+(battery1>=0?ENC_BATTERY_LOADED:0)+(battery2>=0?ENC_BATTERY_LOADED:0);
+	}
+
+	override void beginplay(){
+		super.beginplay();
+		battery1=20;
+		battery2=20;
+	}
+
+	override void OwnerDied(){
+		super.OwnerDied();
+		destroy();
+	}
+
+	override inventory CreateTossable(int amt){
+		if(
+			!player
+			||player.ReadyWeapon!=self
+		){
+		HDArmour.ArmourChangeEffect(owner,90);
+		if(rain){rain.angle=owner.angle;rain.pitch=owner.pitch;rain.A_Recoil(-6);rain.master=null;};
+			return Super.CreateTossable(amt);
+		}
+		if(!HDPlayerPawn.CheckStrip(owner,self))return null;
+		
+		return null;
+	}
+
+	override void tick(){
+		super.tick();
+		
+		if(!rain){
+		RAINSystem rainqueue = RAINSystem(spawn("RAINSystemPlayer",owner.pos,ALLOW_REPLACE));
+		if(rainqueue){
+		rain = rainqueue;
+		if(!rain)return;
+		rain.translation=owner.translation;
+		rain.isWorn=true;
+		if(damaged){rain.health=-1;rain.setstatelabel("dead");}
+		if(destroyed){rain.isdestroyed=true;rain.setstatelabel("xdead");}
+		}
+		return;
+		}
+		if(!rain)return;
+		rain.master=owner;
+		if(rain.health<1)damaged=true;
+		if(rain.isdestroyed)destroyed=true;
+		if(!damaged&&!destroyed){
+		rain.battery1=battery1;
+		rain.battery2=battery2;
+		if(battery2>0&&!random(0,2048))battery2--;
+		if(battery1>0&&!random(0,2048))battery1--;
+		}
+	}
+
+	states{
+	spawn:
+		TNT1 A 0;
+		stop;
+	}
+}
+
+
+
+//worn rain
+class RAINSystemPlayer:RAINSystem{
+	default{
+		//$Category "Monsters/Hideous Destructor"
+		//$Title "R.A.I.N. System (Player-Worn)"
+		//$Sprite "RAINB0"
+	}
+
+	override bool OnGrab(actor grabber){
+		if(isdestroyed||(master&&master.health>0))return false;
+		return true;
+	}
+
+	override void tick(){
+		super.tick();
+		if(master&&master.health>0){
+		A_Warp(AAPTR_MASTER, -((master.radius/2)+8),0,master.height-32, 0,
+			WARPF_NOCHECKPOSITION);
+		bfloorclip=false;
+		bnogravity=true;
+		}else{
+		bnogravity=false;
+		bfloorclip=true;
+		master=null;
+		}
+	}
+}
+
+
+//evil roguebot
+class EnemyRAIN:RAINSystem{
+	default{
+		//$Category "Monsters/Hideous Destructor"
+		//$Title "R.A.I.N. System (Hostile)"
+		//$Sprite "RAINB0"
+
+		-friendly
+		translation 1;
+	}
+
+	override bool OnGrab(actor grabber){
+		if(isdestroyed||(master&&master.health>0))return false;
+		return true;
+	}
+
+	int rainoff;
+	override void postbeginplay(){
+		super.postbeginplay();
+		rainoff=randompick(-12,12);
+	}
+
+	override void tick(){
+		super.tick();
+		if(master&&master.health>0&&health>0)A_Warp(AAPTR_MASTER, 0,rainoff,master.height-8, 0,
+			WARPF_NOCHECKPOSITION);
+	}
+}
+
+//damaged robot to place on maps
+class RAINDead:EnemyRAIN{
+	default{
+		//$Category "Monsters/Hideous Destructor"
+		//$Title "D.R.R.C. System (Dead)"
+		//$Sprite "RAIND0"
+	}
+	override void postbeginplay(){
+		super.postbeginplay();
+		A_Die("spawndead");
+	}
+}
+
+class CountermeasureMissile : Actor
+{
+	Default
+	{
+		Radius 4;
+		Height 4;
+		Scale 1.2;
+		-SOLID
+		+NOINTERACTION
+		+ZDOOMTRANS
+		+NOGRAVITY
+		+NODAMAGE
+		+NOBLOOD
+		+FLOAT
+		RenderStyle "Add";
+		Alpha 1;
+		DeathSound "weapons/plascrack";
+	}
+	States
+	{
+	Spawn:
+		BAL1 A 1 BRIGHT nodelay A_Scream();
+		BAL1 CDE 2 BRIGHT;
+		Stop;
+	}
+}
+
+class RAINDangerClose : Inventory
+{
+	Default
+	{
+		+inventory.undroppable
+		RenderStyle "Add";
+		inventory.maxamount 1;
+	}
+
+	override void tick(){
+		super.tick();
+		if(!owner){destroy();return;}
+		if(!tracer){
+		actor thingy = spawn("RAINDistanceChecker",owner.pos,ALLOW_REPLACE);
+		if(thingy){tracer=thingy;thingy.master=owner;}
+		}
+	}
+}
+
+class RAINDistanceChecker : IdleDummy
+{
+	Default
+	{
+		+NOINTERACTION
+	}
+
+	override void tick(){
+		super.tick();
+		if(!master){destroy();return;}
+		setorigin(master.pos,false);
+		ThinkerIterator RAINIterator = ThinkerIterator.Create("RAINSystem");
+		Actor RAINNearby;
+		while (RAINNearby = RAINSystem(RAINIterator.Next())){
+		    if(!target)target = RAINNearby;
+			if(target&&(distance3d(target)>640)){master.takeinventory("RAINDangerClose",1);destroy();return;}
+		}
+	}
+}
+
+class DoNotTargetByTheRAIN : Inventory
+{
+	Default
+	{
+		+inventory.undroppable
+		RenderStyle "Add";
+		inventory.maxamount 1;
+	}
+}
+
+class ExplosionSimulator : IdleDummy
+{
+	Default
+	{
+		+NOINTERACTION
+	}
+	States
+	{
+	Spawn:
+		TNT1 A 0 nodelay A_JumpIf(stamina==1,"ohitsaflash");
+		TNT1 A 1{
+			bsolid=false;bpushable=false;bmissile=false;bnointeraction=true;bshootable=false;
+			HDFragGrenade.FragBlast(self);
+			actor xpl=spawn("WallChunker",self.pos-(0,0,1),ALLOW_REPLACE);
+				xpl.target=target;xpl.master=master;xpl.stamina=stamina;
+			xpl=spawn("HDExplosion",self.pos-(0,0,1),ALLOW_REPLACE);
+				xpl.target=target;xpl.master=master;xpl.stamina=stamina;
+			A_SpawnChunks("BigWallChunk",14,4,12);
+		}
+		Stop;
+
+	OhItsAFlash:
+		TNT1 A 1 BRIGHT nodelay{
+			bsolid=false;bpushable=false;bmissile=false;bnointeraction=true;bshootable=false;
+			A_HDBlast(
+				pushradius:256,pushamount:128,fullpushradius:96,
+				fragradius:HDCONST_ONEMETRE*12,fragments:random(1,5)
+			);
+			actor xpl=spawn("WallChunker",self.pos-(0,0,1),ALLOW_REPLACE);
+				xpl.target=target;xpl.master=master;xpl.stamina=stamina;
+			A_SpawnChunks("BigWallChunk",14,4,12);
+		}
+		Stop;
+	}
+}

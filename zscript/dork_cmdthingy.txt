@@ -1,0 +1,135 @@
+// ------------------------------------------------------------
+// CCMDs for DORKs
+// ------------------------------------------------------------
+class HDDORKCMDHandler:EventHandler{
+	override void NetworkProcess(ConsoleEvent e){
+		let ppp=hdplayerpawn(players[e.player].mo);
+		if(!ppp)return;
+
+		bool alive=
+			!hdspectator(ppp)
+			&&ppp.health>0
+		;
+
+		if(alive){
+			if(e.name~=="dork")SetDORK(ppp,e.args[0],e.args[1],e.args[2]);
+			else if(e.name~=="dorktag")SetDORK(ppp,-abs(e.args[0]),0,0);
+			else if(e.name~=="dorkhack")hackDORK(ppp,0,0,0);
+		}
+	}
+
+	void HackDORK(hdplayerpawn ppp,int cmd,int tag,int cmd2){
+		let dpu=DORKController(ppp.findinventory("DORKController"));
+		if(
+			dpu
+			&&ppp.player
+			&&ppp.player.readyweapon==dpu
+		)dpu.setownerweaponstate("hack");
+		else ppp.A_Log(Stringtable.Localize("$DORK_NOINTERFACE"),true);
+	}
+	void SetDORK(hdplayerpawn ppp,int cmd,int tag,int cmd2){
+		if(cmd<0){
+			let dpu=DORKUsable(ppp.findinventory("DORKUsable"));
+			if(dpu){
+				dpu.weaponstatus[DORKS_BOTID]=-cmd;
+				ppp.A_Log(string.format(Stringtable.Localize("$DORK_TAGSET"),-cmd),true);
+			}
+			return;
+		}
+		else if(cmd==1024){
+			ppp.A_SetInventory("DORKController",1);
+			ppp.UseInventory(ppp.findinventory("DORKController"));
+			return;
+		}
+		ThinkerIterator it=ThinkerIterator.Create("DORKBot");
+		actor bot=null;
+		int dorks=0;
+		bool badcommand=true;
+		while(bot=DORKBot(it.Next())){
+			let dork=DORKBot(bot);
+			if(
+				!!dork
+				&&dork.master==ppp
+				&&dork.health>0
+				&&(!tag||tag==dork.botid)
+			){
+				bool goalset=false;
+				if(cmd&&cmd<=DORK_PATROL){
+					badcommand=false;
+					dork.cmd=cmd;
+					dork.oldcmd=cmd;
+					string mode;
+					if(cmd==DORK_IDLE){
+						mode=Stringtable.Localize("$DORK_MODEWAIT");
+						dork.movestamina=1001;
+					}
+					else if(cmd==DORK_WATCH){
+						mode=Stringtable.Localize("$DORK_MODELINE");
+						dork.movestamina=1001;
+					}
+					else if(cmd==DORK_TURRET){
+						mode=Stringtable.Localize("$DORK_MODETURRET");
+						dork.movestamina=1001;
+					}
+					else if(cmd==DORK_PATROL){
+						mode=Stringtable.Localize("$DORK_MODEPATROL");
+						dork.movestamina=0;
+					}
+					ppp.A_Log(string.format(Stringtable.Localize("$DORK_MODE"),mode),true);
+				}else if(cmd==DORK_HEEL){
+					badcommand=false;
+					goalset=true;
+					dork.goalpoint=ppp.pos.xy;
+					ppp.A_Log(Stringtable.Localize("$DORK_GOALSETPLAYER"),true);
+				}else if(cmd==DORK_GO){
+					badcommand=false;
+					flinetracedata dorkgoal;
+					ppp.linetrace(
+						ppp.angle,2048,ppp.pitch,
+						TRF_NOSKY,
+						offsetz:ppp.height*0.8,
+						data:dorkgoal
+					);
+					if(dorkgoal.hittype!=Trace_HitNone){
+						goalset=true;
+						dork.goalpoint=dorkgoal.hitlocation.xy;
+						ppp.A_Log(string.format(Stringtable.Localize("$DORK_GOALSETTO"),dorkgoal.hitlocation.x,dorkgoal.hitlocation.y),true);
+					}
+				}else if(cmd>800&&cmd<810){
+					badcommand=false;
+					vector2 which;
+					switch(cmd-800){
+						case 1:which=(-1,-1);break;
+						case 2:which=(0,-1);break;
+						case 3:which=(1,-1);break;
+						case 4:which=(-1,0);break;
+						case 6:which=(1,0);break;
+						case 7:which=(-1,1);break;
+						case 8:which=(0,1);break;
+						case 9:which=(1,1);break;
+						default:return;break;
+					}
+					if(goalset)dork.goalpoint=dork.goalpoint+which*64;
+					else dork.goalpoint=dork.pos.xy+which*64;
+					goalset=true;
+					ppp.A_Log(string.format(Stringtable.Localize("$DORK_GOALSETTO"),dork.goalpoint.x,dork.goalpoint.y),true);
+				}else if(cmd==123){
+					badcommand=false;
+					int ammo=dork.ammo;
+					ppp.A_Log(string.format(Stringtable.Localize("$DORK_REPORTIN1"),dork.botid,dork.pos.x,dork.pos.y,ammo>0?string.format(Stringtable.Localize("$DORK_REPORTIN2"),dork.ammo):Stringtable.Localize("$DORK_REPORTIN3")),true);
+				}
+				if(goalset){
+					dork.movestamina=int(20-(level.vec2diff(dork.pos.xy,dork.goalpoint)).length()/dork.speed);
+					dork.goalangle=dork.angletogoal();
+					dork.setstatelabel("turn");
+				}
+			}
+		}
+		if(badcommand){
+			let dpu=DORKUsable(ppp.findinventory("DORKUsable"));
+			ppp.A_Log(string.format(Stringtable.Localize("$DORK_BADCOMMAND"),dpu?dpu.weaponstatus[DORKS_BOTID]:1),true);
+		}
+	}
+}
+
+

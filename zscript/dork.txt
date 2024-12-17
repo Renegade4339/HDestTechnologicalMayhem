@@ -1,0 +1,1278 @@
+// ------------------------------------------------------------
+// D.O.R.K. Robot
+// ------------------------------------------------------------
+
+/*
+	NOTE FOR MAPPERS
+	You can set mode using user_cmd.
+	0=random (default), see DorkConst below for the others
+*/
+
+const DORK_CONTROLRANGE=HDCONST_ONEMETRE*200.;
+enum DorkConst{
+	DORK_IDLE=1,
+	DORK_WATCH=2,
+	DORK_TURRET=3,
+	DORK_PATROL=4,
+
+	DORK_HEEL=DORK_PATROL+1,
+	DORK_GO=DORK_HEEL+1,
+
+	DORK_RANGE=960,
+	DORK_MAXTICTURN=15,
+
+	DORKS_MODE=1,
+	DORKS_USEOFFS=2,
+	DORKS_AMMO=3,
+	DORKS_BOTID=4,
+	DORKS_CMD=5,
+	DORKS_FUEL=6,
+
+	DORKF_BROKEN=1,
+}
+enum DORKControllerNums{
+	DRKCS_INDEX=1,
+	DRKCS_TIMER=3,
+}
+class DORKBot:HDUPK{
+		//DORK stats
+	int user_cmd;
+	int cmd;
+	int oldcmd;
+	int ammo;
+	int battery;
+	bool cancam;
+	int botid;
+
+		//DORK conditions
+	int integrity;
+	int heat;
+	bool isdestroyed;
+	bool exploding;
+	int oldvel;
+	default{
+		//$Category "Monsters/Hideous Destructor"
+		//$Title "D.O.R.K. Robot"
+		//$Sprite "DORKA1"
+
+		+ismonster +noblockmonst +shootable
+		+friendly +nofear +dontgib +noblood +ghost
+		+nobouncesound +floorclip +nogravity +float
+		painchance 240;painthreshold 12;
+		speed 8;
+		damagefactor "hot",0.7;
+		damagefactor "cold",0.7;
+		damagefactor "Normal",0.8;
+		radius 12;height 22;deathheight 8;
+		bloodcolor "22 22 22";scale 0.6;
+		health 100;mass 45;gibhealth 15;
+		maxtargetrange DORK_RANGE;
+		hdupk.pickupsound "weapons/pismagclick";
+		hdupk.pickupmessage ""; //let the pickup do this
+		obituary "$OB_DORK";
+		tag "$TAG_DORK";
+	}
+	override void tick(){
+		super.tick();
+		if(health>0&&battery>0){
+			A_StartSound("dork/fly2",CHAN_AUTO,CHANF_DEFAULT,0.2,pitch:1.6+0.2*(level.time&(1|2)));
+			if(isfrozen())return;
+			if(vel.x>0)vel.x-=0.125;
+			else if(vel.x<0)vel.x+=0.125;
+			if(vel.y>0)vel.y-=0.125;
+			else if(vel.y<0)vel.y+=0.125;
+			if(vel.z>0)vel.z-=0.125;
+			else if(vel.z<0)vel.z+=0.125;
+		}
+			if(random(0,heat)>=50)A_SpawnItemEx("HDSmoke",0,0,1, vel.x,vel.y,vel.z+4, 0,SXF_NOCHECKPOSITION|SXF_ABSOLUTEMOMENTUM);
+			if(integrity>0&&health<100){givebody(1);integrity--;}
+			if(heat>0&&heat>=250)A_Die("overheat");
+				else if(heat>0&&!random(0,4))heat--;
+			if(battery<1)cancam=false;
+				else if(!random(0,192)&&cancam)battery--;
+	}
+	override bool cancollidewith(actor other,bool passive){return other.bmissile||HDPickerUpper(other)||(DORKBot(other)&&other.health>0);}
+	bool DorkTargetCheck(bool face=false){
+		if(!target)return false;
+		if(
+			target==master
+			||(master&&target.isteammate(master))
+		){
+			A_ClearTarget();
+			A_SetFriendly(true);
+			setstatelabel("spawn");
+			return false;
+		}
+		if(face){
+			A_StartSound("dork/fly");
+			A_FaceTarget(2,2,FAF_TOP);
+		}
+		flinetracedata dlt;
+		linetrace(
+			angle,DORK_RANGE,pitch,
+			offsetz:2,
+			data:dlt
+		);
+		return(dlt.hitactor==target);
+	}
+	void DorkAlert(string msg="You dork!"){
+		if(master)master.A_Log(Stringtable.Localize("$DORK_ALERT2")..(botid?Stringtable.Localize("$DORK_ALERT3")..botid..Stringtable.Localize("$DORK_ALERT4"):"")..Stringtable.Localize("$DORK_ALERT5")..msg,true);
+	}
+	void A_ThunderZap(){
+		if(ammo<1){
+			return;
+		}
+		thunderbuster.thunderzap(self,12,true,ammo);
+		if(!random(0,12))ammo--;
+	}
+	void DorkShot(){
+		A_StartSound("dork/fire",CHAN_WEAPON,CHANF_OVERLAP);
+		if(!random(0,11)){
+			if(bfriendly)A_AlertMonsters(256,AMF_TARGETEMITTER);
+			else A_AlertMonsters();
+		}
+		A_ThunderZap();
+		pitch+=frandom(-1.,1.);angle+=frandom(-1.,1.);
+	}
+	void A_DorkAttack(){
+		if(DorkTargetCheck(false))DorkShot();
+	}
+	void A_DorkLook(int flags=0,statelabel seestate="see"){
+		A_ClearTarget();
+		if(cmd==DORK_IDLE)return;
+		A_LookEx(flags|LOF_NOSOUNDCHECK,label:seestate);
+		if(
+			deathmatch&&bfriendly
+			&&master&&master.player
+		){
+			for(int i=0;i<MAXPLAYERS;i++){
+				if(
+					playeringame[i]
+					&&players[i].mo
+					&&players[i].mo!=master
+					&&(!teamplay||players[i].getteam()!=master.player.getteam())
+					&&distance3dsquared(players[i].mo)<(DORK_RANGE*DORK_RANGE)
+				){
+					A_SetFriendly(false);
+					target=players[i].mo;
+					if(!(flags&LOF_NOJUMP))setstatelabel(seestate);
+					break;
+				}
+			}
+		}
+		if(flags&LOF_NOJUMP&&target&&target.health>0&&checksight(target))setstatelabel("missile");
+	}
+
+	int movestamina;
+	double goalangle;
+	vector2 goalpoint;
+	vector2 originalgoalpoint;
+	double angletogoal(){
+		vector2 vecdiff=level.vec2diff(pos.xy,goalpoint);
+		return atan2(vecdiff.y,vecdiff.x);
+	}
+	void A_DorkFlySound(int chance=50){
+		A_StartSound("dork/fly",CHAN_BODY,CHANF_OVERLAP);
+		if(bfriendly&&!random(0,25))A_AlertMonsters(128,AMF_TARGETEMITTER);
+	}
+	void A_DorkFly(bool attack=true){
+			if(battery<1){setstatelabel("nopower");return;}
+			else if(!random(0,512))battery--;
+		bool moved=true;
+		//wait(1) does nothing, not even make noise
+		if(attack&&cmd!=DORK_IDLE){
+			if(target&&target.health>0)A_Chase(
+				"missile","missile",CHF_DONTMOVE|CHF_DONTTURN|CHF_NODIRECTIONTURN
+			);
+		if(cmd==DORK_PATROL){
+			if(!random(0,64))vel.z-=3;
+			else if(!random(0,56))vel.z+=3;
+			}
+		}
+
+		if(
+			cmd==DORK_PATROL
+			||movestamina<20
+		){
+			A_DorkFlySound();
+			moved=TryMove(pos.xy+(cos(angle),sin(angle))*speed,false);
+			movestamina++;
+		}else if(
+			cmd==DORK_TURRET
+		){
+			A_DorkFlySound();
+			A_SetAngle(angle+36,SPF_INTERPOLATE);
+		}
+
+		if(!moved){
+			goalangle=angle+frandom(30,120)*randompick(-1,1);
+		}else if(
+			movestamina>20
+			&&movestamina<1000
+			&&!random(0,23)
+		){
+			goalangle=angletogoal();
+			if(cmd==DORK_PATROL){
+				goalangle+=frandom(-110,110);
+				movestamina=0;
+			}
+		}else goalangle=999;
+		if(goalangle!=999)setstatelabel("Turn");
+	}
+	void A_DorkTurn(){
+		if(goalangle==999){
+			setstatelabel("see");
+			return;
+		}
+		A_DorkFlySound();
+		double norm=deltaangle(goalangle,angle);
+		if(abs(norm)<DORK_MAXTICTURN){
+			angle=goalangle;
+			goalangle=999;
+			return;
+		}
+		if(norm<0){
+			A_SetAngle(angle+DORK_MAXTICTURN,SPF_INTERPOLATE);
+		}else{
+			A_SetAngle(angle-DORK_MAXTICTURN,SPF_INTERPOLATE);
+		}
+	}
+
+	override int damagemobj(
+		actor inflictor,actor source,int damage,
+		name mod,int flags,double angle
+	){
+		if(mod=="hot")heat+=damage;
+		if(
+			!!source
+			&&(
+				!inflictor
+				||source==inflictor
+			)
+			&&source.health>0
+			&&source.bismonster
+			&&source.bcanusewalls
+			&&(
+				source.instatesequence(source.curstate,source.resolvestate("melee"))
+				||source.instatesequence(source.curstate,source.resolvestate("meleekick"))
+			)
+		){
+			target=source;
+			setz(target.pos.z+target.height*0.7);
+			setstatelabel("give");
+			return -1;
+		}
+		return super.damagemobj(inflictor,source,damage,mod,flags,angle);
+	}
+
+	override void postbeginplay(){
+		super.postbeginplay();
+		originalgoalpoint=pos.xy;
+		goalpoint=originalgoalpoint;
+		goalangle=999;
+		integrity=300;
+		if(!master||!master.player){
+			ammo=20;
+			battery=20;
+			if(user_cmd)cmd=user_cmd;
+			else cmd=random(1,4);
+		}
+		if(
+			cmd<DORK_PATROL
+		)movestamina=1001;
+		oldcmd=cmd;
+	}
+	override bool OnGrab(actor grabber){
+	    if(isdestroyed)return false;
+    	return true;
+	}
+	states{
+	give:
+		DORK A 0{
+			bnogravity=false;
+			oldcmd=cmd;
+			if(cmd!=DORK_IDLE){
+				A_StartSound("weapons/rifleclick2",CHAN_AUTO);
+				cmd=DORK_IDLE;
+			}
+			let ddd=DORKUsable(spawn("DORKUsable",pos));
+			if(ddd){
+				ddd.weaponstatus[DORKS_AMMO]=ammo;
+				ddd.weaponstatus[DORKS_BOTID]=botid;
+				ddd.weaponstatus[DORKS_MODE]=oldcmd;
+				ddd.weaponstatus[DORKS_FUEL]=battery;
+				if(health<1)ddd.weaponstatus[0]|=DORKF_BROKEN;
+				ddd.translation=self.translation;
+				grabthinker.grab(target,ddd);
+			}
+			destroy();
+			DORKController.GiveController(target);
+			return;
+		}goto spawn;
+	spawn:
+		DORK A 0 nodelay;
+	spawn2:
+		DORK A 0 A_ClearTarget();
+		DORK A 0 A_DorkLook();
+		DORK A 3 A_DorkFly();
+		loop;
+	see:
+		DORK A 0 A_ClearTarget();
+		DORK A 0 A_JumpIf(ammo<1&&movestamina<1&&goalangle==-999,"noammo");
+	see2:
+		DORK A 2 A_DorkFly();
+		DORK A 0 A_DorkLook(LOF_NOJUMP);
+		DORK A 2 A_DorkFly();
+		DORK A 0 A_DorkLook(LOF_NOJUMP);
+		DORK A 2 A_DorkFly();
+		DORK A 0 A_DorkLook(LOF_NOJUMP);
+		DORK A 2 A_DorkFly();
+		DORK A 0 A_DorkLook(LOF_NOJUMP);
+		---- A 0 setstatelabel("see");
+	turn:
+		DORK A 1 A_DorkTurn();
+		wait;
+	noshot:
+		DORK BBBBAAAA 2 A_DorkFly();
+		---- A 0 setstatelabel("see2");
+	pain:
+		DORK A 20{
+			A_StartSound("dork/fly",CHAN_BODY);
+			angle+=randompick(1,-1)*random(2,8)*10;
+			pitch-=random(10,20);
+		}
+	missile:
+	ready:
+		DORK BBB 1 A_FaceTarget(20,20,0,0,FAF_TOP,-4);
+		DORK A 0 A_JumpIf(cmd==DORK_IDLE,"spawn");
+		DORK A 0 A_JumpIfTargetInLOS(1,1);
+		loop;
+	aim:
+		DORK A 0 A_StartSound("dork/acquired",CHAN_VOICE,volume:0.6);
+		DORK B 2 A_JumpIf(!DorkTargetCheck(),"noshot");
+		DORK A 0 DorkAlert(Stringtable.Localize("$DORK_AIM"));
+	fire:
+		DORK A 0 A_JumpIfHealthLower(1,"dead");
+		DORK A 0 A_JumpIf(ammo>0,"noreallyfire");
+		goto noammo;
+	noreallyfire:
+		DORK C 1 bright light("PLAZMABX2") DorkShot();
+		DORK C 1;
+		DORK C 4{
+			if(getzat(0)<pos.z) A_ChangeVelocity(cos(pitch)*-2,0,sin(pitch)*2,CVF_RELATIVE);
+			else A_ChangeVelocity(cos(pitch)*-0.4,0,sin(pitch)*0.4,CVF_RELATIVE);
+		}
+		DORK C 1{
+			A_FaceTarget(10,10,0,0,FAF_TOP,-4);
+			if(target&&target.health<1){
+				DorkAlert(Stringtable.Localize("$DORK_KILL"));
+			}
+		}
+	yourefired:
+		DORK A 0 A_JumpIf(
+			!target
+			||target.health<1
+			||cmd==DORK_IDLE
+		,"see");
+		DORK A 0 A_JumpIfTargetInLOS("fire",2,JLOSF_DEADNOJUMP,DORK_RANGE,0);
+		DORK A 0 A_JumpIfTargetInLOS("aim",360,JLOSF_DEADNOJUMP,DORK_RANGE,0);
+		goto noshot;
+	death:
+		DORK D 3{
+			DorkAlert(Stringtable.Localize("$DORK_STANDBY"));
+			A_StartSound("dork/death",CHAN_VOICE,CHANF_OVERLAP);
+			A_StartSound("weapons/bigcrack",CHAN_VOICE,CHANF_OVERLAP);
+			A_SpawnItemEx("HDSmoke",0,0,1, vel.x,vel.y,vel.z+1, 0,SXF_NOCHECKPOSITION|SXF_ABSOLUTEMOMENTUM);
+			A_SpawnChunks("BigWallChunk",12);
+		}
+		DORK E 3;
+	dead:
+		DORK E 3{
+				if(floorz<pos.z-6&&!vel.z==0)oldvel=abs(vel.z);
+				if(floorz>pos.z-6){
+				setstatelabel("nyoop");
+			}
+		}
+		loop;
+	nyoop:
+	death.spawndead:
+		DORK F 1{if(oldvel>=20&&battery>0&&ammo>0)setstatelabel("explode");else oldvel=0;}
+		DORK F 5 A_JumpIf(floorz<=pos.z-6,"dead");
+		wait;
+	nopower:
+		DORK A 0{
+			A_ClearTarget();
+			bfloorclip=true;
+			bnogravity=false;
+			bfloat=false;
+			bnopain=true;
+			DorkAlert(Stringtable.Localize("$DORK_NOFUEL"));}
+		DORK A -1;
+		stop;
+	noammo:
+		DORK A 10{
+			A_ClearTarget();
+			DorkAlert(Stringtable.Localize("$DORK_NOAMMO"));
+		}goto spawn;
+
+	death.electrical:
+	death.bfgballattack:
+	death.balefire:
+	xdeath:
+		DORK D 0{
+			A_StartSound("weapons/bigcrack",CHAN_VOICE,CHANF_OVERLAP);
+			A_SpawnChunks("BigWallChunk",12);
+		}
+	death.overheat:
+		DORK D 0{isdestroyed=true;exploding=true;heat=0;}
+		DORK D 3{
+			DorkAlert(Stringtable.Localize("$DORK_STANDBY"));
+			A_StartSound("dork/death",CHAN_VOICE,CHANF_OVERLAP);
+			A_SpawnItemEx("HDSmoke",0,0,1, vel.x,vel.y,vel.z+1, 0,SXF_NOCHECKPOSITION|SXF_ABSOLUTEMOMENTUM);
+		}
+	weeeeeeee:
+		DORK D 0 A_SpawnItemEx("HDSmoke",0,0,1, vel.x,vel.y,vel.z+1, 0,SXF_NOCHECKPOSITION|SXF_ABSOLUTEMOMENTUM);
+		DORK E 3 A_JumpIf(floorz>pos.z-6,"explode");
+		loop;
+	explode:
+		DORK D 0{isdestroyed=true;exploding=false;}
+		DORK F 3{
+		doordestroyer.destroydoor(self,42,frandom(3,16));
+
+		//explosion
+			A_GiveInventory("Heat",1000);
+			A_SprayDecal("Scorch",16);
+			A_HDBlast(
+				pushradius:256,pushamount:128,fullpushradius:96,
+				fragradius:HDCONST_ONEMETRE*(10+0.2*stamina),fragtype:"HDB_frag",
+				immolateradius:128,immolateamount:random(3,60),
+				immolatechance:25
+			);
+			actor xpl=spawn("Gyrosploder",pos-(0,0,1),ALLOW_REPLACE);
+			xpl.target=target;xpl.master=master;xpl.stamina=stamina;
+			distantnoise.make(self,"world/rocketfar");
+		A_SpawnChunksFrags("HDB_frag",180,0.8+0.05*stamina);
+		}
+		DORK GHI 3;
+		DORK D 0{if(!random(0,4)&&battery>0)cancam=true;battery=min(battery,random(0,20));}
+	death.spawnxdead:
+	xdead:
+		DORK I 3 A_JumpIf(floorz>=pos.z-6,1);
+		loop;
+		DORK J 5 A_JumpIf(floorz<=pos.z-6,"xdead");
+		loop;
+	}
+}
+
+
+
+class DORKUsable:HDWeapon{
+	default{
+		//$Category "Items/Hideous Destructor"
+		//$Title "D.O.R.K. Robot (Pickup)"
+		//$Sprite "DORKA1"
+
+		+weapon.wimpy_weapon
+		+inventory.invbar
+		+hdweapon.droptranslation
+		+hdweapon.fitsinbackpack
+		hdweapon.barrelsize 0,0,0;
+		weapon.selectionorder 1014;
+
+		scale 0.6;
+		inventory.icon "DORKEX";
+		inventory.pickupmessage "$PICKUP_DORK";
+		//inventory.pickupsound "dork/crawl";
+		translation 0;
+		tag "$TAG_DORK";
+		hdweapon.refid "drk";
+	}
+	override bool AddSpareWeapon(actor newowner){return AddSpareWeaponRegular(newowner);}
+	override hdweapon GetSpareWeapon(actor newowner,bool reverse,bool doselect){return GetSpareWeaponRegular(newowner,reverse,doselect);}
+
+	override int getsbarnum(int flags){
+		let ssbb=HDStatusBar(statusbar);
+		if(ssbb&&weaponstatus[0]&DORKF_BROKEN)ssbb.savedcolour=Font.CR_DARKGRAY;
+		return weaponstatus[DORKS_BOTID];
+	}
+	override void InitializeWepStats(bool idfa){
+		weaponstatus[DORKS_BOTID]=1;
+		weaponstatus[DORKS_AMMO]=20;
+		weaponstatus[DORKS_FUEL]=20;
+		weaponstatus[DORKS_MODE]=DORK_TURRET;
+		if(idfa)weaponstatus[0]&=~DORKF_BROKEN;
+	}
+	override void loadoutconfigure(string input){
+		int mode=getloadoutvar(input,"mode",1);
+		if(mode>0)weaponstatus[DORKS_MODE]=clamp(mode,1,3);
+		mode=getloadoutvar(input,"unloaded",1);
+		if(mode>0){weaponstatus[DORKS_AMMO]=-1;weaponstatus[DORKS_FUEL]=-1;}
+	}
+	override double gunmass(){
+		return 6+(weaponstatus[DORKS_AMMO]>=0?2:0)+(weaponstatus[DORKS_FUEL]>=0?2:0);
+	}
+	override double weaponbulk(){
+		return 80+(weaponstatus[DORKS_AMMO]>=0?ENC_BATTERY_LOADED:0)+(weaponstatus[DORKS_FUEL]>=0?ENC_BATTERY_LOADED:0);
+	}
+	override string pickupmessage(){
+		string msg=super.pickupmessage();
+		if(weaponstatus[0]&DORKF_BROKEN)return msg..Stringtable.Localize("$PICKUP_DORK_BROKEN");
+		return msg;
+	}
+	override void detachfromowner(){
+		translation=owner.translation;
+		super.detachfromowner();
+	}
+	override void DrawHUDStuff(HDStatusBar sb,HDWeapon hdw,HDPlayerPawn hpl){
+		int ofs=weaponstatus[DORKS_USEOFFS];
+		if(ofs>90)return;
+		let ddd=DORKUsable(owner.findinventory("DORKUsable"));
+		if(!ddd||ddd.amount<1)return;
+		let pmags=HDBattery(owner.findinventory("HDBattery"));
+
+		vector2 bob=hpl.wepbob*0.2;
+		bob.y+=ofs;
+		sb.drawimage("DORKA8A2",(0,22)+bob,
+			sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER|sb.DI_TRANSLATABLE,
+			alpha:!!pmags?1.:0.6,scale:(2,2)
+		);
+
+		if(ofs>30)return;
+
+		int mno=hdw.weaponstatus[DORKS_MODE];
+		string mode;
+		if(hdw.weaponstatus[0]&DORKF_BROKEN)mode=Stringtable.Localize("$DORK_BROKEN");
+		else if(mno==DORK_IDLE)mode=Stringtable.Localize("$DORK_WAIT");
+		else if(mno==DORK_WATCH)mode=Stringtable.Localize("$DORK_LINE");
+		else if(mno==DORK_TURRET)mode=Stringtable.Localize("$DORK_TURRET");
+		else if(mno==DORK_PATROL)mode=Stringtable.Localize("$DORK_PATROL");
+		sb.drawstring(
+			sb.psmallfont,mode,(0,34)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+
+
+		sb.drawstring(
+			sb.psmallfont,Stringtable.Localize("$DORK_BOTID")..ddd.weaponstatus[DORKS_BOTID],(0,44)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+
+	if(weaponstatus[DORKS_FUEL]<0)mode=Stringtable.Localize("$DORK_NOPOWER");
+		else mode=Stringtable.Localize("$DORK_POWER")..weaponstatus[DORKS_FUEL];
+		sb.drawstring(
+			sb.psmallfont,mode,(0,54)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+		if(weaponstatus[DORKS_AMMO]<0)mode=Stringtable.Localize("$DORK_NOMAG");
+		else mode=Stringtable.Localize("$DORK_MAG")..weaponstatus[DORKS_AMMO];
+		sb.drawstring(
+			sb.psmallfont,mode,(0,64)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+
+
+		if(sb.hudlevel==1){
+		sb.drawbattery(-54,-4,sb.DI_SCREEN_CENTER_BOTTOM,reloadorder:true);
+			sb.drawnum(hpl.countinv("HDBattery"),-46,-8,sb.DI_SCREEN_CENTER_BOTTOM);
+		}
+			int bffb=hdw.weaponstatus[DORKS_AMMO];
+		if(bffb>0)sb.drawwepnum(bffb,20,posy:-10);
+		else if(!bffb)sb.drawstring(
+			sb.mamountfont,"000000",
+			(-16,-14),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+		bffb=hdw.weaponstatus[DORKS_FUEL];
+		if(bffb>0)sb.drawwepnum(bffb,20);
+		else if(!bffb)sb.drawstring(
+
+			sb.mamountfont,"000000",
+			(-16,-7),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+	}
+	override string gethelptext(){
+		return
+		((weaponstatus[0]&DORKF_BROKEN)?
+		(WEPHELP_FIRE.."+"..WEPHELP_RELOAD.."  Repair\n"):(WEPHELP_FIRE.."  Deploy\n"))
+		..WEPHELP_ALTFIRE.."  Cycle modes\n"
+		..WEPHELP_FIREMODE.."+"..WEPHELP_UPDOWN.."  Set BotID\n"
+		..WEPHELP_RELOAD.."  Reload weapon battery\n"
+		..WEPHELP_UNLOAD.."  Unload weapon battery\n"
+		..WEPHELP_ALTRELOAD.."  Reload main battery\n"
+		..WEPHELP_USE.."+"..WEPHELP_ALTRELOAD.."  Unload main battery\n"
+		;
+	}
+	action void A_AddOffset(int ofs){
+		invoker.weaponstatus[DORKS_USEOFFS]+=ofs;
+	}
+
+
+	static int backpackrepairs(actor owner,hdbackpack bp){
+		if(!owner||!bp)return 0;
+		StorageItem si=bp.Storage.Find('dorkusable');
+		int fixbonus=0;
+		if (si){
+			// [Ace] The original implementation had a bug (?) where if you had two DORKS and the first one was destroyed for parts, the second one would be skipped.
+			// Same thing with the H.E.R.P.
+			for(int i=0;si.Amounts.Size()>0&&i<si.Amounts[0];){
+				if (si.WeaponStatus[HDWEP_STATUSSLOTS*i]&DORKF_BROKEN){
+					if (!random(0,6-fixbonus)){
+						//fix
+						si.WeaponStatus[HDWEP_STATUSSLOTS*i]&=~DORKF_BROKEN;
+						if (fixbonus>0)fixbonus--;
+						owner.A_Log(Stringtable.Localize("$DORK_REPAIRPACK"),true);
+					}else if(!random(0,6)){
+						fixbonus++;
+						//delete and restart
+						bp.Storage.RemoveItem(si,null,null,index:i);
+						i=0;
+						owner.A_Log(Stringtable.Localize("$DORK_REPAIRPACK_FAIL"),true);
+						continue;
+					}
+				}
+				i++;
+			}
+		}
+		return fixbonus;
+	}
+	override void consolidate(){
+		if(!owner)return;
+		int fixbonus=backpackrepairs(owner,hdbackpack(owner.FindInventory("HDBackpack",true)));
+		let spw=spareweapons(owner.findinventory("spareweapons"));
+		if(spw){
+			for(int i=0;i<spw.weapontype.size();i++){
+				if(spw.weapontype[i]!=getclassname())continue;
+				array<string>wpst;wpst.clear();
+				spw.weaponstatus[i].split(wpst,",");
+				int wpstint=wpst[0].toint();
+				if(
+					wpstint&DORKF_BROKEN
+				){
+					if(!random(0,max(0,6-fixbonus))){
+						if(fixbonus>0)fixbonus--;
+						wpstint&=~DORKF_BROKEN;
+						owner.A_Log(Stringtable.Localize("$DORK_REPAIR"),true);
+						string newwepstat=spw.weaponstatus[i];
+						newwepstat=wpstint..newwepstat.mid(newwepstat.indexof(","));
+						spw.weaponstatus[i]=newwepstat;
+					}else if(!random(0,6)){
+						//delete
+						fixbonus++;
+						spw.weaponbulk.delete(i);
+						spw.weapontype.delete(i);
+						spw.weaponstatus.delete(i);
+						owner.A_Log(Stringtable.Localize("$DORK_REPAIR_FAIL"),true);
+						//go back to start
+						i=0;
+						continue;
+					}
+				}
+			}
+		}
+		if(
+			(weaponstatus[0]&DORKF_BROKEN)
+			&&!random(0,7-fixbonus)
+		){
+			weaponstatus[0]&=~DORKF_BROKEN;
+			owner.A_Log(Stringtable.Localize("$DORK_FIELDREPAIR"),true);
+		}
+	}
+	override void postbeginplay(){
+		super.postbeginplay();
+		if(
+			owner
+			&&owner.player
+			&&owner.getage()<5
+		)weaponstatus[DORKS_MODE]=cvar.getcvar("dk_dorkmode",owner.player).getint();
+	}
+	states{
+	spawn:
+		DORK A -1;
+		stop;
+	select:
+		TNT1 A 0 A_AddOffset(100);
+		goto super::select;
+	ready:
+		TNT1 A 1{
+			if(pressinguser3()){
+				A_MagManager("HDBattery");
+				return;
+			}
+			int iofs=invoker.weaponstatus[DORKS_USEOFFS];
+			if(iofs>0)invoker.weaponstatus[DORKS_USEOFFS]=iofs*2/3;
+			if(pressingfiremode()){
+				int ptch=
+					(GetMouseY(true)>>4)
+					+(justpressed(BT_ATTACK)?1:justpressed(BT_ALTATTACK)?-1:0)
+				;
+				if(ptch){
+					invoker.weaponstatus[DORKS_BOTID]=clamp(
+						ptch+invoker.weaponstatus[DORKS_BOTID],0,63
+					);
+				}
+			}
+			else if(justpressed(BT_ALTATTACK)){
+				int mode=invoker.weaponstatus[DORKS_MODE];
+				if(pressinguse())mode--;else mode++;
+				if(mode<1)mode=DORK_PATROL;
+				else if(mode>DORK_PATROL)mode=1;
+				invoker.weaponstatus[DORKS_MODE]=mode;
+				return;
+			}
+			else if(pressingfire()){
+				setweaponstate("deploy");
+				return;
+			}
+			A_WeaponReady(WRF_NOFIRE|WRF_ALLOWRELOAD|WRF_ALLOWUSER1|WRF_ALLOWUSER4);
+		}goto readyend;
+	deploy:
+		TNT1 AA 1 A_AddOffset(4);
+		TNT1 AAAA 1 A_AddOffset(9);
+		TNT1 AAAA 1 A_AddOffset(20);
+		TNT1 A 0 A_JumpIf(!pressingfire(),"ready");
+		TNT1 A 4 A_StartSound("weapons/pismagclick",CHAN_WEAPON);
+		TNT1 A 2;
+		TNT1 A 1{
+			if(invoker.weaponstatus[0]&DORKF_BROKEN){
+				setweaponstate("readytorepair");
+				return;
+			}
+		}
+		TNT1 A 0{
+			if(invoker.weaponstatus[DORKS_FUEL]<1){
+	A_Log(Stringtable.Localize("$DORK_NOMAINPOWER"),true);
+				setweaponstate("nope");
+				return;
+			}
+			A_StartSound("dork/activate",CHAN_VOICE,
+			CHANF_OVERLAP);
+			actor a;int b;
+			[b,a]=A_SpawnItemEx("DORKBot",12,0,gunheight()-4,
+				cos(pitch)*6,0,-sin(pitch)*6,0,
+				SXF_NOCHECKPOSITION|SXF_TRANSFERPOINTERS|
+				SXF_SETMASTER|SXF_TRANSFERTRANSLATION|SXF_SETTARGET
+			);
+			let dork=dorkbot(a);
+			dork.vel+=vel;
+			dork.cmd=invoker.weaponstatus[DORKS_MODE];
+			dork.botid=invoker.weaponstatus[DORKS_BOTID];
+			dork.ammo=invoker.weaponstatus[DORKS_AMMO];
+			dork.battery=invoker.weaponstatus[DORKS_FUEL];
+
+			DORKController.GiveController(self);
+
+			dropinventory(invoker);
+			invoker.goawayanddie();
+		}
+		goto nope;
+	unload:
+		TNT1 A 6 A_JumpIf(invoker.weaponstatus[DORKS_AMMO]<0,"nope");
+		TNT1 A 3 A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+		TNT1 A 0{
+			int ammount=invoker.weaponstatus[DORKS_AMMO];
+			if(pressingunload())HDMagAmmo.GiveMag(self,"HDBattery",ammount);
+			else{
+				HDMagAmmo.SpawnMag(self,"HDBattery",ammount);
+				setweaponstate("nope");
+			}
+			invoker.weaponstatus[DORKS_AMMO]=-1;
+		}
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		goto nope;
+	reload:
+		TNT1 A 0 A_JumpIf(invoker.weaponstatus[DORKS_AMMO]>=0,"nope");
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		TNT1 A 10 A_JumpIf(HDMagAmmo.NothingLoaded(self,"HDBattery"),"nope");
+		TNT1 A 6{
+			A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+			invoker.weaponstatus[DORKS_AMMO]=HDMagAmmo(findinventory("HDBattery")).TakeMag(true);
+		}
+		goto nope;
+	altunload:
+		TNT1 A 6 A_JumpIf(invoker.weaponstatus[DORKS_FUEL]<0,"nope");
+		TNT1 A 3 A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+		TNT1 A 0{
+			int ammount=invoker.weaponstatus[DORKS_FUEL];
+			if(pressinguse())HDMagAmmo.GiveMag(self,"HDBattery",ammount);
+			else{
+				HDMagAmmo.SpawnMag(self,"HDBattery",ammount);
+				setweaponstate("nope");
+			}
+			invoker.weaponstatus[DORKS_FUEL]=-1;
+		}
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		goto nope;
+	user1:
+	altreload:
+		TNT1 A 0 A_JumpIf(pressinguse(),"altunload");
+		TNT1 A 0 A_JumpIf(invoker.weaponstatus[DORKS_FUEL]>=0,"nope");
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		TNT1 A 10 A_JumpIf(HDMagAmmo.NothingLoaded(self,"HDBattery"),"nope");
+		TNT1 A 6{
+			A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+			invoker.weaponstatus[DORKS_FUEL]=HDMagAmmo(findinventory("HDBattery")).TakeMag(true);
+		}
+		goto nope;
+
+
+	readytorepair:
+		TNT1 A 1{
+			if(!pressingfire())setweaponstate("nope");
+			else if(justpressed(BT_RELOAD)){
+				if(invoker.weaponstatus[DORKS_FUEL]>=0){
+
+					A_Log(Stringtable.Localize("$DORK_REMOVEMAG"),true);
+				}
+				else if(invoker.weaponstatus[DORKS_AMMO]>=0){
+
+					A_Log(Stringtable.Localize("$DORK_REMOVEMAG"),true);
+				}else setweaponstate("repairbash");
+			}
+		}
+		wait;
+	repairbash:
+		TNT1 A 5{
+			int failchance=40;
+			int spareindex=-1;
+			//find spares, whether to cannibalize or copy
+			let spw=spareweapons(findinventory("spareweapons"));
+			if(spw){
+				for(int i=0;i<spw.weapontype.size();i++){
+					if(
+						spw.weapontype[i]==getclassname()
+						&&spw.GetWeaponValue(i,0)&DORKF_BROKEN
+					){
+						if(spareindex==-1)spareindex=i;
+						failchance=min(10,failchance-7);
+						break;
+					}
+				}
+			}
+			if(!random(0,failchance)){
+				invoker.weaponstatus[0]&=~DORKF_BROKEN;
+				A_SetHelpText();
+				A_StartSound("dork/repair",CHAN_WEAPON);
+				A_Log(Stringtable.Localize("$DORK_REPAIRED"),true);
+				//destroy one spare
+				if(
+					spareindex>=0
+					&&!random(0,2)
+				){
+					spw.weaponbulk.delete(spareindex);
+					spw.weapontype.delete(spareindex);
+					spw.weaponstatus.delete(spareindex);
+					A_Log(Stringtable.Localize("$DORK_CANNIBALIZED"),true);
+				}
+			}else A_StartSound("dork/repairtry",CHAN_WEAPONBODY,CHANF_OVERLAP,
+				volume:frandom(0.6,1.),pitch:frandom(1.2,1.4)
+			);
+			A_MuzzleClimb(
+				frandom(-1.,1.),frandom(-1.,1.),
+				frandom(-1.,1.),frandom(-1.,1.),
+				frandom(-1.,1.),frandom(-1.,1.),
+				frandom(-1.,1.),frandom(0.,1.)
+			);
+		}
+		TNT1 A 0 A_JumpIf(!(invoker.weaponstatus[0]&DORKF_BROKEN),"nope");
+		goto readytorepair;
+	}
+}
+
+
+//evil roguebot
+class EnemyDORK:DORKBot{
+	default{
+		//$Category "Monsters/Hideous Destructor"
+		//$Title "D.O.R.K. Robot (Hostile)"
+		//$Sprite "DORKA1"
+
+		-friendly
+		translation 1;
+	}
+}
+
+//damaged robot to place on maps
+class DORKDead:EnemyDORK{
+	default{
+		//$Category "Monsters/Hideous Destructor"
+		//$Title "D.O.R.K. Robot (Dead)"
+		//$Sprite "DORKA1"
+	}
+	override void postbeginplay(){
+		super.postbeginplay();
+		A_Die("spawndead");
+	}
+}
+
+
+
+class DORKController:HDWeapon{
+   const FrameRate = 10;
+    const FrameTime = 35. / FrameRate;
+    ui double lastTime;
+	default{
+		+inventory.invbar
+		+weapon.wimpy_weapon
+		+nointeraction
+		+hdweapon.droptranslation
+		inventory.icon "DORKA5";
+		tag "$TAG_DORKINTERFACE";
+		weapon.selectionorder 1012;
+	}
+	array<dorkbot> dorks;
+	action dorkbot A_UpdateDorks(bool resetindex=true){
+		return invoker.UpdateDorks(resetindex);
+	}
+	dorkbot UpdateDorks(bool resetindex=true){
+		dorks.clear();
+		if(!owner)return null;
+		ThinkerIterator dorkfinder=thinkerIterator.Create("DORKBot");
+		dorkbot mo;
+		while(mo=DORKBot(dorkfinder.Next())){
+			if(
+				mo.master==owner
+				&&mo.distance3d(owner)<frandom(1024,2048)
+			)dorks.push(mo);
+		}
+		if(resetindex)weaponstatus[DRKCS_INDEX]=0;
+		if(!dorks.size()){
+			destroy();
+			return null;
+		}
+		dorkbot ddd=dorks[0];
+		ddd.oldcmd=ddd.cmd;
+		return ddd;
+	}
+	static void GiveController(actor caller){
+		caller.A_SetInventory("DORKController",1);
+		caller.findinventory("DORKController").binvbar=true;
+		let ddc=DORKController(caller.findinventory("DORKController"));
+		ddc.updatedorks(false);
+		if(!ddc.dorks.size())caller.dropinventory(ddc);
+	}
+	int NextDork(){
+		int newindex=weaponstatus[DRKCS_INDEX]+1;
+		if(newindex>=dorks.size())newindex=0;
+		if(weaponstatus[DRKCS_INDEX]!=newindex){
+			owner.A_Log(Stringtable.Localize("$DORK_SWITCHING"),true);
+			weaponstatus[DRKCS_INDEX]=newindex;
+		}
+		return newindex;
+	}
+	action void Abort(){
+		A_Log(Stringtable.Localize("$DORK_NODORKS"),true);
+		A_SelectWeapon("HDFist");
+		setweaponstate("nope");
+		dropinventory(invoker);
+	}
+	override inventory CreateTossable(int amt){
+		if(
+			(dorks.size()&&dorks[NextDork()])
+			||updatedorks(false)
+		)return null;
+		return weapon.createtossable(amt);
+	}
+	override string gethelptext(){
+		return
+		WEPHELP_FIREMODE.."  Hold to pilot\n"
+		..WEPHELP_FIRESHOOT
+		..WEPHELP_ALTFIRE.."  Upwards\n"
+		..WEPHELP_USE.."  Downwards\n"
+		..WEPHELP_RELOAD.."  Cycle through modes\n"
+		..WEPHELP_UNLOAD.."  Jump to Passive mode\n"
+		..WEPHELP_DROP.."  Next D.O.R.K."
+		;
+	}
+	override void DrawSightPicture(
+		HDStatusBar sb,HDWeapon hdw,HDPlayerPawn hpl,
+		bool sightbob,vector2 bob,double fov,bool scopeview,actor hpc
+	){
+		if(
+			!dorks.size()
+			||weaponstatus[DRKCS_INDEX]>=dorks.size()
+		)return;
+		let dorkcam=dorks[weaponstatus[DRKCS_INDEX]];
+		if(!dorkcam)return;
+
+		int scaledyoffset=46;
+		int integrity=dorkcam.integrity+dorkcam.health;
+		bool canreallycam=(dorkcam.cancam&&dorkcam.battery>0);
+		if(
+			dorkcam.exploding
+			||canreallycam
+		){
+		name cuhtex=!random(0,2)?"HDXHCAM1BLANK":"HDXCAM_DORK";
+			//THANK YOU PHANTOMBETA YOU ABSOLUTE
+			//DERG
+		bool flickering=(cuhtex=="HDXHCAM1BLANK");
+        let curTime = level.time + 0.5;
+        if (curTime - lastTime >= FrameTime) {
+            lastTime = curTime;
+
+            let camTex = TexMan.CheckForTexture ("HDXCAM_DORK");
+            let cv = TexMan.GetCanvas ("HDXCAM_DORKDEST");
+
+            cv.DrawTexture (camTex, true, 0, 0, DTA_Fullscreen);
+        }
+            screen.DrawTexture (TexMan.CheckForTexture ("HDXCAM_DORKDEST"), true,1035+(bob.x*3),542+scaledyoffset+(bob.y*3),DTA_ScaleX,0.62,DTA_ScaleY,0.78);
+		texman.setcameratotexture(dorkcam,cuhtex,60);
+		if(flickering)sb.drawimage(
+			cuhtex,(0,scaledyoffset)+bob,sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER,
+			alpha:1.,scale:flickering?(1,1):((0.25/1.2),0.25)
+		);
+		sb.drawimage(
+			"tbwindow",(0,scaledyoffset)+bob,sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER,
+			scale:(1,1)
+		);
+		if(!random(0,2))sb.drawimage(
+			"redpxl",(0,scaledyoffset)+bob,sb.DI_SCREEN_CENTER|sb.DI_ITEM_TOP,
+			alpha:0.4,scale:(2,2)
+		);
+		sb.drawnum(random(0,999),
+			-16+bob.x,22+bob.y,sb.DI_SCREEN_CENTER,Font.CR_WHITE,0.4
+		);
+		sb.drawnum(random(10,99),
+			24+bob.x,22+bob.y,sb.DI_SCREEN_CENTER,Font.CR_RED,0.4
+		);
+		sb.drawnum(random(10,99),
+			24+bob.x,32+bob.y,sb.DI_SCREEN_CENTER,Font.CR_GREEN,0.4
+		);
+		int cmd=random(1,9);
+		sb.drawnum(cmd,
+			24+bob.x,42+bob.y,sb.DI_SCREEN_CENTER,cmd==3?Font.CR_BRICK:cmd==1?Font.CR_GOLD:Font.CR_LIGHTBLUE,0.4
+		);
+}else{
+		bool dead=(dorkcam.health<1);
+		bool nobat=dead||dorkcam.battery<1;
+		name ctex=nobat?"HDXHCAM1BLANK":"HDXCAM_DORK";
+		if(!nobat)texman.setcameratotexture(dorkcam,ctex,60);
+		sb.drawimage(
+			ctex,(0,scaledyoffset)+bob,sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER,
+			alpha:dead?frandom[dorkydork](0.6,0.9):1.,scale:nobat?(1,1):((0.25/1.2),0.25)
+		);
+		sb.drawimage(
+			"tbwindow",(0,scaledyoffset)+bob,sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER,
+			scale:(1,1)
+		);
+		if(!dead)sb.drawimage(
+			"redpxl",(0,scaledyoffset)+bob,sb.DI_SCREEN_CENTER|sb.DI_ITEM_TOP,
+			alpha:0.4,scale:(2,2)
+		);
+		sb.drawnum(dead?0:max(0,dorkcam.ammo),
+			24+bob.x,22+bob.y,sb.DI_SCREEN_CENTER,Font.CR_RED,0.4
+		);
+		sb.drawnum(dead?0:max(0,integrity),
+			-16+bob.x,22+bob.y,sb.DI_SCREEN_CENTER,integrity>=300?Font.CR_LIGHTBLUE:integrity>=200?Font.CR_GREEN:integrity>=100?Font.CR_GOLD:Font.CR_RED,0.4
+		);
+		sb.drawnum(dead?0:max(0,dorkcam.battery),
+			24+bob.x,32+bob.y,sb.DI_SCREEN_CENTER,Font.CR_GREEN,0.4
+		);
+		int cmd=dead?0:dorkcam.oldcmd;
+		sb.drawnum(cmd,
+			24+bob.x,42+bob.y,sb.DI_SCREEN_CENTER,cmd==3?Font.CR_BRICK:cmd==1?Font.CR_GOLD:Font.CR_LIGHTBLUE,0.4
+		);
+}
+	}
+	states{
+	select:
+		TNT1 A 10{invoker.weaponstatus[DRKCS_TIMER]=3;}
+		goto super::select;
+	ready:
+		TNT1 A 1{
+			if(!invoker.dorks.size()||invoker.weaponstatus[DRKCS_INDEX]>=invoker.dorks.size()
+				||justpressed(BT_USER1)
+			){
+				a_updatedorks();
+				if(!invoker.dorks.size()){
+					Abort();
+				}
+				return;
+			}
+			A_WeaponReady(WRF_NOFIRE|WRF_ALLOWUSER3);
+			dorkbot ddd=invoker.dorks[invoker.weaponstatus[DRKCS_INDEX]];
+			if(!ddd){
+				if(ddd=a_updatedorks())A_Log(Stringtable.Localize("$DORK_NOTFOUND"),true);
+				else{
+					Abort();
+				}
+				return;
+			}
+
+			int bt=player.cmd.buttons;
+
+			if(
+				(!ddd.exploding&&!ddd.cancam)
+				&&(
+				ddd.health<1
+				||ddd.battery<1
+				||(
+					bt
+					&&!invoker.weaponstatus[DRKCS_TIMER]
+					&&ddd.distance3d(self)>frandom(0.9,1.1)*DORK_CONTROLRANGE
+					)
+				)
+			){
+				A_Log(Stringtable.Localize("$DORK_LASTPOS1")..int(ddd.pos.x)+random(-100,100)..Stringtable.Localize("$DORK_LASTPOS2")..int(ddd.pos.y)+random(-100,100)..Stringtable.Localize("$DORK_LASTPOS3"),true);
+				ddd.cmd=ddd.oldcmd;
+				invoker.dorks.delete(invoker.weaponstatus[DRKCS_INDEX]);
+				if(!invoker.dorks.size()){
+					A_SelectWeapon("HDFist");
+					invoker.destroy();
+				}
+				return;
+			}
+
+			int cmd=ddd.oldcmd;
+			bool moved=false;
+
+
+			if((justpressed(BT_UNLOAD))&&!ddd.cancam){
+				cmd=2;
+				A_Log(Stringtable.Localize("$DORK_IDLEMODE"),true);
+			}else if((justpressed(BT_RELOAD))&&!ddd.cancam){
+				cmd++;
+				if(cmd>4)cmd=1;
+				if(cmd==DORK_IDLE)A_Log(Stringtable.Localize("$DORK_IDLEMODE"),true);
+				else if(cmd==DORK_WATCH)A_Log(Stringtable.Localize("$DORK_WATCHMODE"),true);
+				else if(cmd==DORK_TURRET)A_Log(Stringtable.Localize("$DORK_WATCH360MODE"),true);
+				else if(cmd==DORK_PATROL)A_Log(Stringtable.Localize("$DORK_PATROLMODE"),true);
+			}
+
+			ddd.oldcmd=cmd;
+			if((bt&BT_FIREMODE)&&!ddd.cancam){
+				ddd.cmd=DORK_IDLE;
+				ddd.A_ClearTarget();
+				if(!invoker.weaponstatus[DRKCS_TIMER]){
+					if(
+						justpressed(BT_ATTACK)
+					){
+						invoker.weaponstatus[DRKCS_TIMER]+=4;
+						if(ddd.ammo>0&&ddd.health>0){
+							ddd.setstatelabel("noreallyfire");
+							ddd.tics=2; //for some reason a 1-tic firing frame won't show
+						}else if(ddd.health>0) ddd.setstatelabel("noammo");
+						return;
+					}else if(
+						(
+							player.cmd.forwardmove
+						)
+						&&!invoker.weaponstatus[DRKCS_TIMER]
+						&&ddd.health>0
+					){
+						invoker.weaponstatus[DRKCS_TIMER]+=2;
+						ddd.A_DorkFlySound();
+						vector2 nv2=(cos(ddd.angle),sin(ddd.angle))*ddd.speed;
+						if(pressingzoom())nv2*=-1;
+						ddd.TryMove(ddd.pos.xy+nv2,true);
+						int thrustvel2=1;
+						if(bt&BT_USE)thrustvel2=-1;
+						if
+							(
+								(bt&BT_ALTATTACK)
+								||(bt&BT_USE)
+							)ddd.vel.z+=thrustvel2*(ddd.speed/18);
+						moved=true;
+					}else if(
+						(
+							(bt&BT_ALTATTACK)
+							||(bt&BT_USE)
+						)
+						&&!invoker.weaponstatus[DRKCS_TIMER]
+						&&ddd.health>0
+					){
+						invoker.weaponstatus[DRKCS_TIMER]+=2;
+						ddd.A_DorkFlySound();
+						int thrustvel=1;
+						if(bt&BT_USE)thrustvel=-1;
+						ddd.vel.z+=thrustvel*(ddd.speed/18);
+					}
+				}
+				int yaw=clamp(GetMouseX(true)>>5,-10,10);
+				if(!yaw)yaw=clamp(-player.cmd.sidemove,-10,10);
+				int ptch=clamp(GetMouseY(true)>>5,-10,10);
+				if(yaw||ptch){
+					ddd.A_DorkFlySound(150);
+					ddd.pitch=clamp(ddd.pitch-clamp(ptch,-10,10),-90,60);
+					ddd.angle+=clamp(yaw,-DORK_MAXTICTURN,DORK_MAXTICTURN);
+					ddd.goalangle=999;
+					ddd.movestamina=1001;
+					if(yaw)moved=true;
+				}
+			}else{
+				ddd.cmd=cmd;
+				if(cmd==DORK_PATROL&&ddd.movestamina>=1000)ddd.movestamina=0;
+			}
+
+			if(!invoker.bweaponbusy&&hdplayerpawn(self))hdplayerpawn(self).nocrosshair=0;
+			if(invoker.weaponstatus[DRKCS_TIMER]>0)invoker.weaponstatus[DRKCS_TIMER]--;
+		}goto readyend;
+	user3:
+		---- A 0 A_MagManager("HDBattery");
+		goto ready;
+	hack:
+		---- A 5 A_Log(Stringtable.Localize("$DORK_FETCHDEVICES"),true);
+		---- AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA 1 A_WeaponReady(WRF_NOFIRE|WRF_ALLOWUSER3);
+		---- AAAAAAAAAAAAAA 1 A_WeaponMessage("\cj"..random(10000,99999).." "..random(10000,99999),10);
+		---- A 0{
+			if(random(0,7))invoker.HackNearbyDorks();
+			A_StartSound("dork/crawl",CHAN_WEAPON);
+		}
+		goto nope;
+	spawn:
+		TNT1 A 0;
+		stop;
+	}
+
+
+
+	//attempt to use the controller to connect to another D.O.R.K.
+	bool HackNearbyDorks(){
+		if(!owner||!dorks.size())return false;
+		ThinkerIterator dorkfinder=thinkerIterator.Create("DORKBot");
+		dorkbot mo;
+		while(mo=DORKBot(dorkfinder.Next())){
+			if(
+				mo.master!=owner
+				&&mo.battery>0
+				&&!mo.isdestroyed
+				&&mo.distance3d(owner)<frandom(0.9,1.1)*DORK_CONTROLRANGE
+			){
+				let opponent=mo.master;
+				int hackable=0;
+				if(mo.checksight(owner))hackable+=2;
+				if(
+					!opponent
+					||!mo.checksight(opponent)
+					||mo.distance3d(opponent)>(DORK_CONTROLRANGE*0.6)
+				)hackable+=3;
+				if(random(0,hackable)){
+					mo.master=owner;
+					if(opponent){
+						let opcon=DORKController(opponent.findinventory("DORKController"));
+						if(opcon)opcon.updatedorks(false);
+						opponent.A_Log(Stringtable.Localize("$DORK_CONNECTIONFAILURE1")..int(mo.pos.x)+random(-100,100)..Stringtable.Localize("$DORK_CONNECTIONFAILURE2")..int(mo.pos.y)+random(-100,100)..Stringtable.Localize("$DORK_CONNECTIONFAILURE3"),true);
+					}
+					owner.A_Log(Stringtable.Localize("$DORK_CONNECTED1")..int(mo.pos.x)+random(-100,100)..Stringtable.Localize("$DORK_CONNECTED2")..int(mo.pos.y)+random(-100,100)..Stringtable.Localize("$DORK_CONNECTED3"),true);
+					mo.cmd=DORK_IDLE;
+					if(owner.player)mo.bfriendly=true;else mo.bfriendly=owner.bfriendly;
+					mo.A_StartSound("dork/hacked",69420);
+					updatedorks();
+					return true;
+				}else{
+					mo.target=owner;
+					string omghax=Stringtable.Localize("$DORK_CONNECTIONATTEMPTMADE1")..owner.gettag()..Stringtable.Localize("$DORK_CONNECTIONATTEMPTMADE2")..int(owner.pos.x)+random(-10,10)..Stringtable.Localize("$DORK_CONNECTIONATTEMPTMADE3")..int(owner.pos.y)+random(-10,10)..Stringtable.Localize("$DORK_CONNECTIONATTEMPTMADE4");
+					if(opponent)opponent.A_Log(omghax,true);
+					else mo.cmd=DORK_PATROL;
+					owner.A_Log(omghax,true);
+					return false;
+				}
+			}
+		}
+		owner.A_Log(Stringtable.Localize("$DORK_REMOTELOGINFAILED"),true);
+		return false;
+	}
+}
+
+
+

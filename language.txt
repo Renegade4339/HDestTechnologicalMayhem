@@ -1,0 +1,177 @@
+[en enc eng eni ena enz default]
+//Ribs (don't) grow back. -- MEDIGUN
+PICKUP_MEDIPACK="Picked up a medipack. Vunderbar!";
+TAG_MEDIPACK="\"Heilung\" Medipack";
+MEDIGUN_ALLSET=" Let's go practice medicine.";
+OB_MEDIGUN="%k administered %o with the wrong medicine.";
+TAG_MEDIGUN="\"Asclepius\" Medigun";
+PICKUP_MEDIGUN="You got the medigun!";
+MEDIPACK_PUTON="Putting on the medipack.";
+
+MEDIPACK_SHIELD="Shield";
+MEDIPACK_UBER="Übercharge";
+MEDIPACK_NORMAL="Healing Beam";
+
+MEDIPACK_NOPOWER="\cg<\cuNo Charge Power\cg>";
+MEDIPACK_POWER="\cdBattery Charge Power\cj: \cq";
+
+PICKUP_UBERDEVICE="Picked up an Übercharge Tolerance Device. Perfect.";
+TAG_UBERDEVICE="Übercharge Tolerance Device";
+MESSAGE_HASUTD="You have the device injected in.";
+MESSAGE_HASUTDOTHER=" has the device injected.";
+MESSAGE_HASUTDOTHERMOB="They have the device injected in.";
+UBERDEVICE_STOPSQUIRMING="Stop squirming!\n\n%s only wants to\n\ngive you some modification...";
+UBERDEVICE_NOTHINGTOBEDONE="Nothing to be done here.\n\nModify thyself? (press fire)";
+
+
+//"Trust me." -T800 -- M642
+PICKUP_AMMOPACK="Picked up an ammo pack.";
+TAG_AMMOPACK="M642 ammo pack";
+M642_AMOUNT_0="No rounds. Gotta reload.";
+M642_AMOUNT_1="You have a few shots left.";
+M642_AMOUNT_3="Use the pack in short bursts.";
+M642_AMOUNT_6="Better be careful in sustained fire.";
+M642_AMOUNT_75="The ammo is slightly used.";
+M642_AMOUNT_95="Time to terminate!";
+OB_M642="%o was terminated by %k.";
+TAG_M642="M642 \"Terminator\" Flechette Minigun";
+PICKUP_M642="You got the minigun! Ohoho.";
+PICKUP_M642BATTERY="Picked up a disposable battery.";
+TAG_M642BATTERY="Disposable M642 Battery";
+M642_RELOADED1="You inserted ";
+M642_RELOADED2=" 6.42mm rounds into the ammo pack during your downtime.";
+M642_NOGUN="Now which gun uses it...";
+M642_PUTON="Putting on the ";
+
+
+//RAIN System
+PICKUP_RAIN="Picked up a Regional Attack Interference Node system.";
+TAG_RAIN="R.A.I.N. System";
+PICKUP_RAIN_BROKEN=" It is damaged.";
+OB_RAIN="%o received an explosive trophy.";
+
+RAIN_PUTON="Putting on the R.A.I.N. system.";
+RAIN_BROKEN="\cm<broken>";
+RAIN_BOTID="\cubotid \cy";
+RAIN_NOWEAPONPOWER="\cm<no weapon power>";
+RAIN_WEAPONPOWER="Weapon Power:  ";
+RAIN_NOPOWER="\cm<no main power>";
+RAIN_RADARPOWER="Main Power:  ";
+RAIN_REPAIRPACK="You repair one of the broken R.A.I.N.s in your backpack.";
+RAIN_REPAIRPACK_FAIL="You destroy one of the broken R.A.I.N.s in your backpack in your repair efforts.";
+RAIN_REPAIR="You repair one of your broken R.A.I.N.s.";
+RAIN_REPAIR_FAIL="You destroy one of your broken R.A.I.N.s in your repair efforts.";
+RAIN_FIELDREPAIR="You manage some improvised field repairs to your R.A.I.N. robot.";
+RAIN_REMOVEMAG="Remove any battery before attempting repairs.";
+RAIN_NOMAINPOWER="No power. Reload main battery first.";
+RAIN_REPAIRED="You bring your R.A.I.N. back into working condition.";
+RAIN_CANNIBALIZED="Another R.A.I.N. was cannibalized for parts.";
+
+
+//bñuy - RIFC Device
+RIFC_TEXT="\c-- + - ( \ct< [ \cgHACKING DEVICE \ct] >\c- ) - + -\c-\n\n\nDisables any AI-based\ndevice within a specified range.\n\nHold \cdUSE \c-for controls.";
+PICKUP_RIFC="Picked up a hacking device.";
+TAG_RIFC="RIFC Hacking Device"; //repost if fox cute. RIFC literally stands for "Remote InterFerence Controller"
+RIFC_FETCHDERPS="Hacking nearby D.E.R.P.s...";
+RIFC_FETCHHERPS="Hacking nearby H.E.R.P.s...";
+RIFC_FETCHIEDS="Hacking nearby I.E.D.s...";
+RIFC_SABOTAGEDCOMMON1="WARNING: DEVICE HIJACKED AT LOCATION (";
+RIFC_SABOTAGEDCOMMON2=",";
+RIFC_DERPSABOTAGED=")! D.E.R.P. sabotaged.";
+RIFC_HERPSABOTAGED=")! H.E.R.P. sabotaged.";
+RIFC_IEDSABOTAGEDENEMY=")! I.E.D. sabotaged.";
+RIFC_DERPDISABLED="D.E.R.P. disabled at (";
+RIFC_HERPDISABLED="H.E.R.P. disabled at (";
+RIFC_IEDSABOTAGED="I.E.D. sabotaged at (";
+RIFC_DISABLED1=",";
+RIFC_DISABLED2=").";
+RIFC_HACKATTEMPTLOCATION="WARNING: UNKNOWN INTERFERENCE DETECTED AT (";
+RIFC_HACKATTEMPTMADE=")! Hack attempted, action required!";
+RIFC_HACKFAILED="Hacking attempt failed.";
+
+
+//DORK
+PICKUP_DORK="Picked up a Deployable Overcharge Robot for Killjoys.";
+TAG_DORK="D.O.R.K. robot";
+PICKUP_DORK_BROKEN=" It is damaged.";
+OB_DORK="%o went dork.";
+
+HDOPTIONVALUE_DORKMODE_IDLE="Idle";
+HDOPTIONVALUE_DORKMODE_WATCH="Watch";
+HDOPTIONVALUE_DORKMODE_TURRET="Turret";
+HDOPTIONVALUE_DORKMODE_PATROL="Patrol";
+HDOPTIONS_DORKMODE="Personal Gear: DORK mode";
+
+DORK_ALERT1="You dork!";
+DORK_ALERT2="\cd[DORK";
+DORK_ALERT3="(\cj";
+DORK_ALERT4="\cd)";
+DORK_ALERT5="]\cj  ";
+DORK_AIM="\cjEngaging hostile.";
+DORK_KILL="\cf  Hostile eliminated.";
+DORK_STANDBY="\cg  Operational fault.\cj Standby for repairs.";
+DORK_NOFUEL="\cg  Main power low.\cj Standby for recharge.";
+DORK_NOAMMO="\cjWeapon battery depleted. Await retrieval.";
+DORK_BROKEN="\cm<broken>";
+DORK_WAIT="\ccWAIT";
+DORK_LINE="\ceLINE";
+DORK_TURRET="\caTURRET";
+DORK_PATROL="\cgPATROL";
+DORK_BOTID="\cubotid \cy";
+DORK_NOMAG="\cm<no battery>";
+DORK_MAG="Weapon Power:  ";
+DORK_NOPOWER="\cm<no main power>";
+DORK_POWER="Main Power:  ";
+DORK_REPAIRPACK="You repair one of the broken D.O.R.K.s in your backpack.";
+DORK_REPAIRPACK_FAIL="You destroy one of the broken D.O.R.K.s in your backpack in your repair efforts.";
+DORK_REPAIR="You repair one of your broken D.O.R.K.s.";
+DORK_REPAIR_FAIL="You destroy one of your broken D.O.R.K.s in your repair efforts.";
+DORK_FIELDREPAIR="You manage some improvised field repairs to your D.O.R.K. robot.";
+DORK_REMOVEMAG="Remove any battery before attempting repairs.";
+DORK_NOMAINPOWER="No power. Reload main battery first.";
+DORK_REPAIRED="You bring your D.O.R.K. back into working condition.";
+DORK_CANNIBALIZED="Another D.O.R.K. was cannibalized for parts.";
+TAG_DORKINTERFACE="D.O.R.K. Interface";
+DORK_NOINTERFACE="No controller connection active. Bring up the interface first.";
+DORK_TAGSET="\cd[DORK]  \cutag set to  \cy%i";
+DORK_ITSBROKEN="\cd[DORK]  \cuIt's broken.";
+DORK_CANTDEPLOY="\cd[DORK]  \cuCan't deploy here.";
+DORK_MODEWAIT="cWAIT";
+DORK_MODELINE="cLINE";
+DORK_MODETURRET="aTURRET";
+DORK_MODEPATROL="gPATROL";
+DORK_MODE="\cd[DORK]  \c%s  \cjmode";
+DORK_GOALSETPLAYER="\cd[DORK]  \cugoal set to  \cyYOUR POSITION";
+DORK_GOALSETTO="\cd[DORK]  \cugoal set to  \cx[%i,%i]";
+DORK_REPORTIN1="\cd[DORK] \cjtag #\cx%i \cjreporting in at [\cx%i\cj,\cx%i\cj] with %s";
+DORK_REPORTIN2="\cy%i\cj battery precentage left!";
+DORK_REPORTIN3="\crweapon batterry depleted!\cj Help!";
+DORK_BADCOMMAND="\cd[DORK]\cj List of available commands:\n             dorkt    \cjidle mode  (1)\n             dorka    \cjwatch mode  (2)\n             dorkp    \cjwatch360 mode  (3)\n             dorkcome \cjpatrol mode (4)\n             dorkcome \cjcome to user (5)\n             dorkgo   \cjgo to point  (6)\n             dorkmv*   \cjadvance in direction (n/s/ne/sw/etc.)  (5)\n             dorktag  \cjset tag #   (-x)\n \cu(all of these can be shortened\n\cuwith \"k\" instead of \"dork\")\n\n \cuType \cddork 123\cu to poll deployed DORKs.\n \cuCurrent tag is \cx%i.";
+DORK_SWITCHING="Switching to next D.O.R.K. in the list.";
+DORK_NODORKS="No D.O.R.K.s deployed. Abort.";
+DORK_NOTFOUND="D.O.R.K. not found. Resetting list.";
+DORK_LASTPOS1="CONNECTION FAILURE, REBOOT REQUIRED!: D.O.R.K. last position given at (";
+DORK_LASTPOS2=",";
+DORK_LASTPOS3=")";
+DORK_IDLEMODE="Idle mode.";
+DORK_WATCHMODE="Watch mode.";
+DORK_WATCH360MODE="Watch360 mode.";
+DORK_PATROLMODE="Patrol mode.";
+DORK_FETCHDEVICES="Fetching nearby devices...";
+DORK_CONNECTIONFAILURE1="CONNECTION FAILURE, REBOOT REQUIRED!: D.O.R.K. last position given at (";
+DORK_CONNECTIONFAILURE2=",";
+DORK_CONNECTIONFAILURE3=")";
+DORK_CONNECTED1="D.O.R.K. connected at (";
+DORK_CONNECTED2=",";
+DORK_CONNECTED3=").";
+DORK_CONNECTIONATTEMPTMADE1="D.O.R.K. connection attempt made by user ";
+DORK_CONNECTIONATTEMPTMADE2=" at (";
+DORK_CONNECTIONATTEMPTMADE3=",";
+DORK_CONNECTIONATTEMPTMADE4=")";
+DORK_REMOTELOGINFAILED="D.O.R.K. remote login attempt failed.";
+
+
+//Nothing to be done here. Zorch thyself? - ECTD
+PICKUP_ECTD="Picked up an experimental configurable teleportation device.";
+PICKUP_ECTD_SIMPLIFIED=" The controls are different.";
+TAG_ECTD="E.C.T Device";

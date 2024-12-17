@@ -1,0 +1,9 @@
+Model MediShieldDummy
+{
+	Path "Models"
+	Model 0 "medishield.obj"
+	Skin 0 "medishield.png"
+	Scale 32.0 32.0 32.0
+
+	Frame MDSH A 0 "frame01"
+}

@@ -1,0 +1,563 @@
+class HDMedipack : HDWeapon {
+	default {
+		//$Category "Items/Hideous Destructor"
+		//$Title "Medipack"
+		//$Sprite "MDPKA0"
+		+Inventory.INVBAR
+		Inventory.amount 1;
+		+weapon.wimpy_weapon
+		+inventory.invbar
+		-hdweapon.droptranslation
+		-hdweapon.fitsinbackpack
+		hdweapon.barrelsize 0,0,0;
+		weapon.selectionorder 1014;
+		hdweapon.refid "mdp";
+		Tag "$TAG_MEDIPACK";
+		Inventory.icon "MDPKA0";
+		Inventory.pickupmessage "$PICKUP_MEDIPACK";
+		scale 1;
+	}
+	int cooldown;
+
+	override double weaponbulk(){
+		return 100;
+	}
+
+	action void A_WearPack(){
+		bool helptext=HDWeapon.CheckDoHelpText(self);
+
+		invoker.wornlayer=STRIP_BACKPACK;
+		bool intervening=!HDPlayerPawn.CheckStrip(self,invoker,false);
+		invoker.wornlayer=0;
+
+		if(intervening){
+
+			//check if it's ONLY the backpack layer that's in the way
+			invoker.wornlayer=STRIP_BACKPACK+1;
+			bool notarmour=!HDPlayerPawn.CheckStrip(self,invoker,false);
+			invoker.wornlayer=0;
+
+			if(
+				notarmour
+				||invoker.cooldown>0
+			){
+				HDPlayerPawn.CheckStrip(self,self);
+			}else invoker.cooldown=10;
+			return;
+		}
+
+		//and finally put on the actual armour
+		HDMedipack.ArmourChangeEffect(self,100);
+		A_GiveInventory("HDMedipackWorn");
+		let worn=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		worn.healbat=invoker.weaponstatus[MDPKS_HEALBAT];
+		worn.uberbat=invoker.weaponstatus[MDPKS_UBERBAT];
+		worn.shieldbat=invoker.weaponstatus[MDPKS_SHIELDBAT];
+		worn.healbatq=invoker.weaponstatus[MDPKS_HEALBATQ];
+		worn.uberbatq=invoker.weaponstatus[MDPKS_UBERBATQ];
+		worn.shieldbatq=invoker.weaponstatus[MDPKS_SHIELDBATQ];
+		worn.uberbatdmg=invoker.weaponstatus[MDPKS_UBERBATDMG];
+		if(invoker.weaponstatus[0]&MDPKF_CHARGEFROMUBER)worn.chargefromuber=true;
+		invoker.amount--;
+
+		invoker.WearPackHelpText(self);
+	}
+
+	override void doeffect(){
+		if(cooldown>0)cooldown--;
+		if(!amount)destroy();
+		super.doeffect();
+	}
+
+	override void tick(){
+		if(weaponstatus[MDPKS_HEALBATQ]>0){
+			if(!random(0,512)&&weaponstatus[MDPKS_HEALBAT]<100){
+				weaponstatus[MDPKS_HEALBATQ]--;
+				weaponstatus[MDPKS_HEALBAT]++;
+			}
+		}
+		if((weaponstatus[0]&MDPKF_CHARGEFROMUBER)&&!random(0,512)&&weaponstatus[MDPKS_UBERBAT]>0&&weaponstatus[MDPKS_UBERBATQ]<20){
+				weaponstatus[MDPKS_UBERBAT]--;
+				weaponstatus[MDPKS_UBERBATQ]++;
+		}else if(weaponstatus[MDPKS_UBERBATQ]>0&&!(weaponstatus[0]&MDPKF_CHARGEFROMUBER)){
+			if(!random(0,512)&&weaponstatus[MDPKS_UBERBAT]<100){
+				weaponstatus[MDPKS_UBERBATQ]--;
+				weaponstatus[MDPKS_UBERBAT]++;
+			}
+		}else if(weaponstatus[MDPKS_UBERBAT]<100&&!random(0,1024)){
+				weaponstatus[MDPKS_UBERBAT]++;
+		}
+		if(weaponstatus[MDPKS_SHIELDBATQ]>0){
+			if(!random(0,512)&&weaponstatus[MDPKS_SHIELDBAT]<100){
+				weaponstatus[MDPKS_SHIELDBATQ]--;
+				weaponstatus[MDPKS_SHIELDBAT]++;
+			}
+		}
+		if(weaponstatus[MDPKS_UBERBATDMG]>0){
+			if(!random(0,640)&&weaponstatus[MDPKS_UBERBAT]>(100-weaponstatus[MDPKS_UBERBATDMG])){
+				weaponstatus[MDPKS_UBERBAT]--;
+			}
+		}
+		super.tick();
+	}
+
+	void WearPackHelpText(actor wearer){
+		if(!HDWeapon.CheckDoHelpText(wearer))return;
+		string medicine=" ";
+		if(wearer.findinventory("HDMedigun"))medicine=Stringtable.Localize("$MEDIGUN_ALLSET");
+		wearer.A_Log(
+			Stringtable.Localize("$MEDIPACK_PUTON")
+			..medicine
+		,true);
+	}
+
+	override void InitializeWepStats(bool idfa){
+		weaponstatus[MDPKS_MODE]=MDPK_HEAL;
+		weaponstatus[MDPKS_HEALBATQ]=-1;
+		weaponstatus[MDPKS_UBERBATQ]=-1;
+		weaponstatus[MDPKS_SHIELDBATQ]=-1;
+		if(idfa){
+			weaponstatus[MDPKS_HEALBATQ]=20;
+			weaponstatus[MDPKS_UBERBATQ]=20;
+			weaponstatus[MDPKS_SHIELDBATQ]=20;
+			weaponstatus[MDPKS_HEALBAT]=100;
+			weaponstatus[MDPKS_UBERBAT]=100;
+			weaponstatus[MDPKS_SHIELDBAT]=100;
+		}
+	}
+
+	static void ArmourChangeEffect(actor owner,int delay=25){
+		owner.A_StartSound("misc/w_pkup",CHAN_BODY);
+		owner.vel.z+=1.;
+		let onr=HDPlayerPawn(owner);
+		if(onr){
+			onr.stunned+=45;
+			onr.striptime=delay;
+			onr.AddBlackout(256,96,128);
+		}else owner.A_SetBlend("00 00 00",1,6,"00 00 00");
+	}
+
+	override void DrawHUDStuff(HDStatusBar sb,HDWeapon hdw,HDPlayerPawn hpl){
+		int ofs=weaponstatus[MDPKS_USEOFFS];
+		if(ofs>90)return;
+		let ddd=HDMedipack(owner.findinventory("HDMedipack"));
+		if(!ddd||ddd.amount<1)return;
+		let pmags=HDBattery(owner.findinventory("HDBattery"));
+
+		vector2 bob=hpl.wepbob*0.2;
+		bob.y+=ofs;
+		sb.drawimage("MDPKA0",(0,22)+bob,
+			sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER|sb.DI_TRANSLATABLE,
+			alpha:!!pmags?1.:0.6,scale:(2,2)
+		);
+
+		if(ofs>30)return;
+
+		int mno=hdw.weaponstatus[MDPKS_MODE];
+		string mode;
+		if(mno==MDPK_HEAL)mode=Stringtable.Localize("$MEDIPACK_NORMAL");
+		else if(mno==MDPK_UBER)mode=Stringtable.Localize("$MEDIPACK_UBER");
+		else if(mno==MDPK_SHIELD)mode=Stringtable.Localize("$MEDIPACK_SHIELD");
+		sb.drawstring(
+			sb.psmallfont,mode,(0,34)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+
+	if(
+		(weaponstatus[MDPKS_HEALBATQ]<1&&mno==MDPK_HEAL)
+		||(weaponstatus[MDPKS_UBERBATQ]<1&&mno==MDPK_UBER)
+		||(weaponstatus[MDPKS_SHIELDBATQ]<1&&mno==MDPK_SHIELD)
+	)mode=Stringtable.Localize("$MEDIPACK_NOPOWER");
+		else mode=Stringtable.Localize("$MEDIPACK_POWER")..(mno==MDPK_HEAL?
+		(weaponstatus[MDPKS_HEALBATQ]):(mno==MDPK_UBER?
+		(weaponstatus[MDPKS_UBERBATQ]):(weaponstatus[MDPKS_SHIELDBATQ])));
+		sb.drawstring(
+			sb.psmallfont,mode,(0,54)+bob,
+			sb.DI_TEXT_ALIGN_CENTER|sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER
+		);
+
+
+		if(sb.hudlevel==1){
+		sb.drawbattery(-54,-4,sb.DI_SCREEN_CENTER_BOTTOM,reloadorder:true);
+			sb.drawnum(hpl.countinv("HDBattery"),-46,-8,sb.DI_SCREEN_CENTER_BOTTOM);
+		}
+			int bffb=hdw.weaponstatus[MDPKS_HEALBAT];
+			int medimode=hdw.weaponstatus[MDPKS_MODE];
+			bool chargingfromuber=(hdw.weaponstatus[0]&MDPKF_CHARGEFROMUBER);
+			sb.drawstring(sb.pnewsmallfont, (chargingfromuber?"U>B":"B>U"), (-46,-16), sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT, Font.CR_RED, scale:(0.5,0.5));
+		if(medimode!=1&&bffb>0)sb.drawstring(
+			sb.mamountfont,"------",
+			(-16,-14),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_RED
+		);
+		else if(bffb>0)sb.drawwepnum(bffb,100,posy:-10);
+		else if(!bffb)sb.drawstring(
+			sb.mamountfont,"000000",
+			(-16,-14),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+		bffb=hdw.weaponstatus[MDPKS_UBERBAT];
+		if(medimode!=2&&bffb>0)sb.drawstring(
+			sb.mamountfont,"------",
+			(-16,-7),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_RED
+		);
+		else if(bffb>0)sb.drawwepnum(bffb,100);
+		else if(!bffb)sb.drawstring(
+			sb.mamountfont,"000000",
+			(-16,-7),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+		bffb=hdw.weaponstatus[MDPKS_SHIELDBAT];
+		if(medimode!=3&&bffb>0)sb.drawstring(
+			sb.mamountfont,"------",
+			(-16,-21),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_RED
+		);
+		else if(bffb>0)sb.drawwepnum(bffb,100,posy:-15);
+		else if(!bffb)sb.drawstring(
+			sb.mamountfont,"000000",
+			(-16,-21),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+	}
+	override string gethelptext(){
+		return
+		WEPHELP_FIRE.."  Wear pack\n"
+		..WEPHELP_ALTFIRE.."  Cycle batteries\n"
+		..WEPHELP_FIREMODE.."  Charge batteries from Uber\n"
+		..WEPHELP_RELOAD.."  Reload selected battery\n"
+		..WEPHELP_UNLOAD.."  Unload selected battery\n"
+		;
+	}
+
+	action void A_AddOffset(int ofs){
+		invoker.weaponstatus[MDPKS_USEOFFS]+=ofs;
+	}
+
+	States{
+	spawn:
+		MDPK A -1;
+		stop;
+	select:
+		TNT1 A 0 A_AddOffset(100);
+		goto super::select;
+	ready:
+		TNT1 A 1{
+			if(pressinguser3()){
+				A_MagManager("HDBattery");
+				return;
+			}
+			else if(justpressed(BT_USER2)){
+				invoker.weaponstatus[0]^=MDPKF_CHARGEFROMUBER;
+				if(invoker.weaponstatus[0]&MDPKF_CHARGEFROMUBER)A_StartSound("medigun/open",8);
+				else A_StartSound("medigun/close",8);
+				return;
+			}
+			int iofs=invoker.weaponstatus[MDPKS_USEOFFS];
+			if(iofs>0)invoker.weaponstatus[MDPKS_USEOFFS]=iofs*2/3;
+			else if(justpressed(BT_ALTATTACK)){
+				int mode=invoker.weaponstatus[MDPKS_MODE];
+				if(pressinguse())mode--;else mode++;
+				if(mode<1)mode=MDPK_SHIELD;
+				else if(mode>MDPK_SHIELD)mode=1;
+				invoker.weaponstatus[MDPKS_MODE]=mode;
+				return;
+			}
+			else if(pressingfire()){
+				setweaponstate("deploy");
+				return;
+			}
+			A_WeaponReady(WRF_NOFIRE|WRF_ALLOWRELOAD|WRF_ALLOWUSER1|WRF_ALLOWUSER4);
+		}goto readyend;
+	deploy:
+		TNT1 AA 1 A_AddOffset(4);
+		TNT1 AAAA 1 A_AddOffset(9);
+		TNT1 AAAA 1 A_AddOffset(20);
+		TNT1 A 0 A_JumpIf(!pressingfire(),"ready");
+		TNT1 A 4 A_StartSound("weapons/pismagclick",CHAN_WEAPON);
+		TNT1 A 2;
+		TNT1 A 1 A_WearPack();
+		goto nope;
+	unload:
+		TNT1 A 6{
+			int mode=invoker.weaponstatus[MDPKS_MODE];
+			if(
+			(invoker.weaponstatus[MDPKS_HEALBATQ]<0&&mode==MDPK_HEAL)
+			||(invoker.weaponstatus[MDPKS_UBERBATQ]<0&&mode==MDPK_UBER)
+			||(invoker.weaponstatus[MDPKS_SHIELDBATQ]<0&&mode==MDPK_SHIELD)
+			)setweaponstate("nope");
+		}
+		TNT1 A 3 A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+		TNT1 A 0{
+			int mode=invoker.weaponstatus[MDPKS_MODE];
+			if(mode==MDPK_HEAL){
+			int ammount=invoker.weaponstatus[MDPKS_HEALBATQ];
+			if(pressingunload())HDMagAmmo.GiveMag(self,"HDBattery",ammount);
+			else{
+				HDMagAmmo.SpawnMag(self,"HDBattery",ammount);
+				setweaponstate("nope");
+			}
+			invoker.weaponstatus[MDPKS_HEALBATQ]=-1;
+		}else if(mode==MDPK_UBER){
+			int ammount=invoker.weaponstatus[MDPKS_UBERBATQ];
+			if(pressingunload())HDMagAmmo.GiveMag(self,"HDBattery",ammount);
+			else{
+				HDMagAmmo.SpawnMag(self,"HDBattery",ammount);
+				setweaponstate("nope");
+			}
+			invoker.weaponstatus[MDPKS_UBERBATQ]=-1;
+		}else if(mode==MDPK_SHIELD){
+			int ammount=invoker.weaponstatus[MDPKS_SHIELDBATQ];
+			if(pressingunload())HDMagAmmo.GiveMag(self,"HDBattery",ammount);
+			else{
+				HDMagAmmo.SpawnMag(self,"HDBattery",ammount);
+				setweaponstate("nope");
+			}
+			invoker.weaponstatus[MDPKS_SHIELDBATQ]=-1;
+			}
+		}
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		goto nope;
+	reload:
+		TNT1 A 0{
+			int mode=invoker.weaponstatus[MDPKS_MODE];
+			if(
+			(invoker.weaponstatus[MDPKS_HEALBATQ]>=0&&mode==MDPK_HEAL)
+			||(invoker.weaponstatus[MDPKS_UBERBATQ]>=0&&mode==MDPK_UBER)
+			||(invoker.weaponstatus[MDPKS_SHIELDBATQ]>=0&&mode==MDPK_SHIELD)
+			)setweaponstate("nope");
+		}
+		TNT1 A 20 A_StartSound("weapons/pocket",CHAN_POCKETS);
+		TNT1 A 10; //A_JumpIf(HDMagAmmo.NothingLoaded(self,"HDBattery"),"nope");
+		TNT1 A 6{
+			if(!findinventory("HDBattery"))return;
+			A_StartSound("pistol/pismagclick",CHAN_WEAPON);
+			int mode=invoker.weaponstatus[MDPKS_MODE];
+			if(mode==MDPK_HEAL)
+			invoker.weaponstatus[MDPKS_HEALBATQ]=HDMagAmmo(findinventory("HDBattery")).TakeMag(true);
+			else if(mode==MDPK_UBER)
+			invoker.weaponstatus[MDPKS_UBERBATQ]=HDMagAmmo(findinventory("HDBattery")).TakeMag(true);
+			else if(mode==MDPK_SHIELD)
+			invoker.weaponstatus[MDPKS_SHIELDBATQ]=HDMagAmmo(findinventory("HDBattery")).TakeMag(true);
+		}
+		goto nope;
+	}
+}
+enum MedipackConst{
+	MDPK_HEAL=1,
+	MDPK_UBER=2,
+	MDPK_SHIELD=3,
+
+	MDPKS_MODE=1,
+	MDPKS_USEOFFS=2,
+	MDPKS_HEALBAT=3,
+	MDPKS_UBERBAT=4,
+	MDPKS_SHIELDBAT=5,
+	MDPKS_UBERBATDMG=6,
+	MDPKS_HEALBATQ=7,
+	MDPKS_UBERBATQ=8,
+	MDPKS_SHIELDBATQ=9,
+
+	MDPKF_CHARGEFROMUBER=1,
+}
+
+class HDMedipackWorn:HDArmourWorn{
+	default{
+		tag "$TAG_MEDIPACK";
+		HDDamageHandler.priority 0;
+		HDPickup.wornlayer STRIP_BACKPACK;
+	}
+
+		int healbat;
+		int uberbat;
+		int shieldbat;
+
+		int healbatq;
+		int uberbatq;
+		int shieldbatq;
+
+		int uberbatdmg;
+		bool chargefromuber;
+		bool holdingfire;
+		bool shielded;
+
+	override void beginplay(){
+		super.beginplay();
+		durability=69;
+		healbat=100;
+		uberbat=100;
+		shieldbat=100;
+
+		healbatq=20;
+		uberbatq=20;
+		shieldbatq=20;
+	}
+	override double RestrictSpeed(double speedcap){
+		return min(speedcap,5.);
+	}
+	override double getbulk(){
+		return 25;
+	}
+
+	override void DrawHudStuff(
+		hdstatusbar sb,
+		hdplayerpawn hpl,
+		int hdflags,
+		int gzflags
+	){
+		vector2 coords=
+			(hdflags&HDSB_AUTOMAP)?(4,64):
+			(85,-4)
+		;
+
+		sb.drawbar(
+			"MDPKA0","MDPKA0",
+			durability,1,
+			coords,-1,sb.SHADER_VERT,
+			gzflags
+		);
+	}
+
+	override inventory CreateTossable(int amt){
+		if(!HDPlayerPawn.CheckStrip(owner,self))return null;
+		if(holdingfire){
+		owner.A_StopSound(64);
+		owner.A_StartSound("medigun/release",64,CHANF_OVERLAP);
+		if(shielded)owner.A_StartSound("medishield/retract",64,CHANF_OVERLAP);
+		shielded=false;
+		holdingfire=false;
+		}
+
+		//take off the pack
+		HDMedipack tossed=HDMedipack(owner.spawn("HDMedipack",
+			(owner.pos.xy,owner.pos.z+owner.height-20),
+			ALLOW_REPLACE
+		));
+		tossed.weaponstatus[MDPKS_HEALBAT]=healbat;
+		tossed.weaponstatus[MDPKS_UBERBAT]=uberbat;
+		tossed.weaponstatus[MDPKS_SHIELDBAT]=shieldbat;
+
+		tossed.weaponstatus[MDPKS_HEALBATQ]=healbatq;
+		tossed.weaponstatus[MDPKS_UBERBATQ]=uberbatq;
+		tossed.weaponstatus[MDPKS_SHIELDBATQ]=shieldbatq;
+
+		tossed.weaponstatus[MDPKS_UBERBATDMG]=uberbatdmg;
+		if(chargefromuber)tossed.weaponstatus[0]|=MDPKF_CHARGEFROMUBER;
+		tossed.amount=1;
+		HDMedipack.ArmourChangeEffect(owner,90);
+
+			HDMedigun wep=HDMedigun(owner.FindInventory("HDMedigun"));
+			if(wep&&wep.weaponstatus[0]&MEDIGUNF_LINKED){
+				HDMedigun tossed2=HDMedigun(owner.spawn("HDMedigun",
+				(owner.pos.xy,owner.pos.z+owner.height-32),
+				ALLOW_REPLACE
+				));
+				tossed2.weaponstatus[MEDIGUNS_HEALBATTERY]=0;
+				tossed2.weaponstatus[MEDIGUNS_UBERBATTERY]=0;
+				tossed2.weaponstatus[MEDIGUNS_SHIELDBATTERY]=0;
+				tossed2.weaponstatus[MEDIGUNS_UBERDAMAGE]=0;
+				tossed2.patient=null;
+				tossed2.weaponstatus[0]&=~MEDIGUNF_LINKED;
+				tossed2.vel=owner.vel+(cos(owner.pitch)*(cos(owner.angle),sin(owner.angle)),-sin(owner.pitch)*13);
+				tossed2.angle=owner.angle;
+				tossed2.pitch=owner.pitch;
+				wep.destroy();
+			}
+
+		destroy();
+		return tossed;
+	}
+
+	override void tick(){
+		if(healbatq>0){
+			if(!random(0,512)&&healbat<100){
+				healbatq--;
+				healbat++;
+			}
+		}
+		if(chargefromuber&&!random(0,512)&&uberbat>0&&uberbatq<20){
+				uberbat--;
+				uberbatq++;
+		}else if(uberbatq>0&&!chargefromuber){
+			if(!random(0,512)&&uberbat<100){
+				uberbatq--;
+				uberbat++;
+			}
+		}else if(uberbat<100&&!random(0,1024)){
+			uberbat++;
+		}
+		if(shieldbatq>0){
+			if(!random(0,512)&&shieldbat<100){
+				shieldbatq--;
+				shieldbat++;
+			}
+		}
+		if(uberbatdmg>0){
+			if(!random(0,640)&&uberbat>(100-uberbatdmg)){
+				uberbat--;
+			}
+		}
+		super.tick();
+	}
+
+	states{
+	spawn:
+		TNT1 A 0;
+		stop;
+	}
+
+
+
+	//called from HDPlayerPawn and HDMobBase's DamageMobj
+	override int,name,int,double,int,int,int HandleDamage(
+		int damage,
+		name mod,
+		int flags,
+		actor inflictor,
+		actor source,
+		double towound,
+		int toburn,
+
+		int tostun,
+		int tobreak
+	){
+		return damage,mod,flags,towound,toburn,tostun,tobreak;
+	}
+
+	//called from HDBulletActor's OnHitActor
+	override double,double OnBulletImpact(
+		HDBulletActor bullet,
+		double pen,
+		double penshell,
+
+		double hitangle,
+		double deemedwidth,
+		vector3 hitpos,
+		vector3 vu,
+		bool hitactoristall
+	){
+		return pen,penshell;
+	}
+}
+
+class MedipackWorn : HDPickup{
+	default {
+		-hdpickup.fitsinbackpack
+		hdpickup.refid "mpw";
+		tag "$TAG_MEDIPACK";
+		inventory.maxamount 1;
+	}
+
+	override void postbeginplay() {
+		super.postbeginplay();
+		if(owner) {
+			for(inventory iii=owner.inv;iii!=null;iii=iii.inv){
+				let hdp=hdpickup(iii);
+				if(hdp&&hdp.wornlayer==STRIP_BACKPACK)hdp.destroy();
+			}
+			owner.A_GiveInventory("HDMedipackWorn");
+		}
+		destroy();
+	}
+}

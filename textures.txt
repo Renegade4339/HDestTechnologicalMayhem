@@ -1,0 +1,128 @@
+//Medigun
+sprite MDPKA0,28,24{
+	offset 14,24
+	sprite MDPKA0,0,0
+}
+
+sprite MDGNA0,67,40{
+	offset 34,40
+	sprite MDGNA0,0,0
+}
+
+sprite UTDVA0,18,14{
+	offset 9,14
+	sprite UTDVA0,0,0
+}
+
+sprite MDGGA0,289,448{
+	offset -249,-230
+	xscale 2.5
+	yscale 2.5
+	sprite MDGGA0,0,0
+}
+
+
+//M642
+sprite AMPKA0,34,29{
+
+	offset 22,29
+	sprite AMPKA0,0,0
+}
+
+sprite AMPKB0,25,29{
+
+	offset 13,29
+	sprite AMPKB0,0,0
+}
+
+sprite AMPKC0,34,29{
+
+	offset 22,29
+	sprite AMPKC0,0,0
+}
+
+sprite AMPKD0,25,29{
+
+	offset 13,29
+	sprite AMPKD0,0,0
+}
+
+sprite AMPKE0,25,29{
+
+	offset 13,29
+	patch AMPKB0,0,0{translation "0:255=%[0,0,0]:[0.3,0.14,0]"}
+}
+
+sprite AMPKF0,29,25{
+
+	offset 14,25
+	xscale 0.83
+	yscale 1.2
+	sprite AMPKB0,0,0{rotate 90}
+}
+
+sprite AMPKG0,29,25{
+
+	offset 12,25
+	xscale 0.83
+	yscale 1.2
+	sprite AMPKB0,0,0{rotate 270}
+}
+
+sprite AMPKH0,34,29{
+
+	offset 22,29
+	patch AMPKA0,0,0{translation "0:255=%[0,0,0]:[0.3,0.14,0]"}
+}
+
+sprite M64BA0,17,13{
+
+	offset 8,13
+	sprite M64BA0,0,0
+}
+
+sprite M64BB0,17,13{
+
+	offset 8,13
+	sprite M64BB0,0,0
+}
+
+sprite M64BC0,17,13{
+
+	offset 8,13
+	sprite M64BC0,0,0
+}
+
+sprite M64BD0,17,13{
+
+	offset 8,13
+	sprite M64BD0,0,0
+}
+
+
+//RIFC
+Sprite "RIFCA0", 16, 11
+{
+	Offset 8,11
+	Sprite "RIFCA0", 0, 0
+}
+
+Sprite "RIFCB0", 16, 11
+{
+	Offset 8,11
+	Sprite "RIFCB0", 0, 0
+}
+
+
+//ECTD
+sprite ECTDA0,15,11{
+
+	offset 8,11
+	sprite ECTDA0,0,0
+}
+
+sprite ECTDB0,15,11{
+
+	offset 8,11
+	sprite ECTDB0,0,0
+}

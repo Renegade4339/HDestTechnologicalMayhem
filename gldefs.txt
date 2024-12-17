@@ -1,0 +1,166 @@
+//MEDIGUN
+
+flickerlight MEDISHIELD{
+	color 1 0 0
+	size 128
+	secondarysize 64
+	chance 0.5
+}
+
+pointlight UBER{
+	color 1 0 0
+	size 56
+}
+
+
+//M642
+
+brightmap sprite AMPKC0
+{
+   map brightmaps/M642/AMPKC0.png
+}
+
+brightmap sprite AMPKD0
+{
+   map brightmaps/M642/AMPKD0.png
+}
+
+brightmap sprite M64BA0
+{
+   map brightmaps/M642/m642bat.png
+}
+
+brightmap sprite M64BB0
+{
+   map brightmaps/M642/m642bat.png
+}
+
+brightmap sprite M64BC0
+{
+   map brightmaps/M642/m642bat.png
+}
+
+
+//DORK
+
+brightmap sprite DORKA1
+{
+   map brightmaps/DORK/DORKA1.png
+   disablefullbright
+}
+
+brightmap sprite DORKA8A2
+{
+   map brightmaps/DORK/DORKA8A2.png
+   disablefullbright
+}
+
+brightmap sprite DORKA7A3
+{
+   map brightmaps/DORK/DORKA7A3.png
+   disablefullbright
+}
+
+brightmap sprite DORKA6A4
+{
+   map brightmaps/DORK/DORKA6A4.png
+   disablefullbright
+}
+
+brightmap sprite DORKA5
+{
+   map brightmaps/DORK/DORKA5.png
+   disablefullbright
+}
+
+brightmap sprite DORKB1
+{
+   map brightmaps/DORK/DORKB1.png
+   disablefullbright
+}
+
+brightmap sprite DORKB8B2
+{
+   map brightmaps/DORK/DORKB8B2.png
+   disablefullbright
+}
+
+brightmap sprite DORKB7B3
+{
+   map brightmaps/DORK/DORKB7B3.png
+   disablefullbright
+}
+
+brightmap sprite DORKB6B4
+{
+   map brightmaps/DORK/DORKB6B4.png
+   disablefullbright
+}
+
+brightmap sprite DORKB5
+{
+   map brightmaps/DORK/DORKB5.png
+   disablefullbright
+}
+
+brightmap sprite DORKC1
+{
+   map brightmaps/DORK/DORKC1.png
+   disablefullbright
+}
+
+brightmap sprite DORKC8C2
+{
+   map brightmaps/DORK/DORKC8C2.png
+   disablefullbright
+}
+
+brightmap sprite DORKC7C3
+{
+   map brightmaps/DORK/DORKC7C3.png
+   disablefullbright
+}
+
+brightmap sprite DORKC6C4
+{
+   map brightmaps/DORK/DORKC6C4.png
+   disablefullbright
+}
+
+brightmap sprite DORKC5
+{
+   map brightmaps/DORK/DORKC5.png
+   disablefullbright
+}
+
+brightmap sprite DORKD0
+{
+   map brightmaps/DORK/DORKD0.png
+   disablefullbright
+}
+
+brightmap sprite DORKE0
+{
+   map brightmaps/DORK/DORKE0.png
+   disablefullbright
+}
+
+brightmap sprite DORKG0
+{
+   map brightmaps/DORK/DORKG0.png
+   disablefullbright
+}
+
+brightmap sprite DORKH0
+{
+   map brightmaps/DORK/DORKH0.png
+   disablefullbright
+}
+
+
+//ECTD
+
+brightmap sprite ECTDB0
+{
+   map brightmaps/ECTD/ECTDBM.png
+}

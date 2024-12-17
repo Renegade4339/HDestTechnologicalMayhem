@@ -1,0 +1,631 @@
+// ------------------------------------------------------------
+// Experimental Configurable Teleportation Device
+// ------------------------------------------------------------
+class ECTDevice:HDCellWeapon{
+	default{
+		+inventory.invbar
+		+weapon.wimpy_weapon
+		+hdweapon.fitsinbackpack
+		+hdweapon.droptranslation
+		inventory.icon "ECTDB0";
+		inventory.pickupmessage "$PICKUP_ECTD";
+		hdweapon.refid "ect";
+		tag "$TAG_ECTD";
+		Inventory.PickupSound "weapons/pocket";
+		weapon.selectionorder 128;
+		hdweapon.loadoutcodes "
+			\cusimplified - 0/1, whether it has simple coordinate positioning
+				(e.x Point at the destination you want to go.)
+			\cubooted - 0/1, whether it is already turned on";
+	}
+	vector3 finaldest;
+	int confirmtimer;
+	bool cuejoke;
+
+	override void loadoutconfigure(string input){
+		int simplified=getloadoutvar(input,"simplified",1);
+		if(simplified>0)weaponstatus[0]|=TELEF_SIMPLIFIED;
+		int booted=getloadoutvar(input,"booted",1);
+		if(booted>0)weaponstatus[0]|=TELEF_BOOTED;
+	}
+
+	override string pickupmessage(){
+		bool simplified=weaponstatus[0]&TELEF_SIMPLIFIED;
+		string msg=Stringtable.Localize("$PICKUP_ECTD");
+		if(simplified)return msg..Stringtable.Localize("$PICKUP_ECTD_SIMPLIFIED");
+		return msg;
+	}
+
+	override string gethelptext(){
+			//Config Help - Not Booted
+		if(!(weaponstatus[0]&TELEF_BOOTED))return
+		WEPHELP_USE.." + "..WEPHELP_RELOAD.."  Boot\n"
+		..WEPHELP_RELOADRELOAD
+		..WEPHELP_UNLOADUNLOAD
+		;
+			//Config Help - Booting
+		else if(weaponstatus[TELES_BOOTTIMER]>0&&weaponstatus[0]&TELEF_BOOTED)return
+		"UT Mk. 99 E.C.T Device v1"..(weaponstatus[0]&TELEF_SIMPLIFIED?" S ":" ").."(C)20XX-21XX\nPlease wait...\n"
+		..(weaponstatus[0]&TELEF_CUEJOKE?"\nE.C.T.D Mk. 99(TM) (C)20XX, 21XX Unified Transportation, Inc. All\nrights reserved. Distributed by Infantry\nTransportation Mitigation Inc. under license\nfrom Unified Transportation, Inc. I.T.M. (R) is a\nregistered trademark of Volt-UAC\nused by permission. All other\ntrademarks are the property of their\nrespective owners. Licensed by the UAC.\n\n":"\n")
+		..WEPHELP_USE.." + "..WEPHELP_RELOAD.."  Boot"
+		;
+			//Main Help - Simplified Version
+		else if(weaponstatus[0]&TELEF_SIMPLIFIED)return
+		WEPHELP_FIRE..(weaponstatus[0]&TELEF_NOINPUT?"  \cuNO INPUT AVAILABLE\n":"  Teleport to\cg "..(weaponstatus[TELEV_DESTX]).."\cj,\cd "..(weaponstatus[TELEV_DESTY]).."\cj,\ch "..(weaponstatus[TELEV_DESTZ]).."\n")
+		..WEPHELP_FIREMODE.."  Adjust teleport destination\n"
+		..WEPHELP_RELOADRELOAD
+		..WEPHELP_UNLOADUNLOAD
+		..WEPHELP_USE.." + "..WEPHELP_RELOAD.."  Boot\n
+		  Note:\n
+		   Teleporting with the destination parameters set\n
+		   will reset the configuration."
+		;
+			//Config Help - Relative Positioning
+		else if(pressingfiremode()&&weaponstatus[0]&TELEF_RELATIVE)return
+		"\cjWhile pressing "..WEPHELP_FIREMODE.."...\n"
+		.."  "..WEPHELP_ZOOM.."  Adjust \cgX\cj vector\n"
+		.."  "..WEPHELP_USER3.."  Adjust \cdY\cj vector\n"
+		.."  "..WEPHELP_RELOAD.."  Adjust \chZ\cj vector\n"
+		.."  "..WEPHELP_UNLOAD.."  Clear destination coordinates\n
+		  Note:\n
+		   Teleporting with the destination parameters set\n
+		   will reset the configuration."
+		;
+			//Config Help - Absolute Positioning
+		else if(pressingfiremode())return
+		"\cjWhile pressing "..WEPHELP_FIREMODE.."...\n"
+		.."  "..WEPHELP_ZOOM.."  Adjust \cgX\cj vector\n"
+		.."  "..WEPHELP_USER3.."  Adjust \cdY\cj vector\n"
+		.."  "..WEPHELP_RELOAD.."  Adjust \chZ\cj vector\n"
+		.."  "..WEPHELP_ALTRELOAD.."  Set to your configured CVar destination\n"
+		.."  "..WEPHELP_USE.." + "..WEPHELP_ALTRELOAD.."  Set to your coordinates\n"
+		.."  "..WEPHELP_UNLOAD.."  Clear destination coordinates\n
+		  Configure the your cvar destination using the\n
+		   hd_teledestx, hd_teledesty, and hd_teledestz cvars\n
+		   in the console."
+		;
+			//Main Help - Relative Positioning
+		else if(weaponstatus[0]&TELEF_RELATIVE)return
+		WEPHELP_FIRE..(weaponstatus[0]&TELEF_NOINPUT?"  \cuNO INPUT AVAILABLE\n":"  Teleport to\cg "..(owner.pos.x+weaponstatus[TELEV_DESTX]).."\cj,\cd "..(owner.pos.y+weaponstatus[TELEV_DESTY]).."\cj,\ch "..(owner.pos.z+weaponstatus[TELEV_DESTZ]).."\n")
+		..WEPHELP_ALTRELOAD.."  Toggle absolute position mode\n"
+		..WEPHELP_RELOADRELOAD
+		..WEPHELP_UNLOADUNLOAD
+		..WEPHELP_USE.." + "..WEPHELP_RELOAD.."  Boot\n
+		Hold "..WEPHELP_USE.." and "..WEPHELP_FIREMODE.." to show configuration controls."
+		;
+			//Main Help - Absolute Positioning
+		else return
+		WEPHELP_FIRE.."  Teleport to\cg "..weaponstatus[TELEV_DESTX].."\cj,\cd "..weaponstatus[TELEV_DESTY].."\cj,\ch "..weaponstatus[TELEV_DESTZ].."\n"
+		..WEPHELP_ALTRELOAD.."  Toggle relative position mode\n"
+		..WEPHELP_RELOADRELOAD
+		..WEPHELP_UNLOADUNLOAD
+		..WEPHELP_USE.." + "..WEPHELP_RELOAD.."  Boot\n
+		Hold "..WEPHELP_USE.." and "..WEPHELP_FIREMODE.." to show configuration controls."
+		;
+	}
+	override bool AddSpareWeapon(actor newowner){return AddSpareWeaponRegular(newowner);}
+	override hdweapon GetSpareWeapon(actor newowner,bool reverse,bool doselect){return GetSpareWeaponRegular(newowner,reverse,doselect);}
+
+	override void tick(){
+		super.tick();
+		if(confirmtimer>0)confirmtimer--;
+		if(weaponstatus[TELES_BOOTTIMER]>0)weaponstatus[TELES_BOOTTIMER]--;
+		if(weaponstatus[TELES_BATTERY]<1){weaponstatus[0]&=~TELEF_BOOTED;weaponstatus[TELES_BOOTTIMER]=0;}
+		if(weaponstatus[TELEV_DESTX]==0&&weaponstatus[TELEV_DESTY]==0&&weaponstatus[TELEV_DESTZ]==0&&(weaponstatus[0]&TELEF_RELATIVE))
+		weaponstatus[0]|=TELEF_NOINPUT;
+		else weaponstatus[0]&=~TELEF_NOINPUT;
+		if(hd_debug)console.printf("booted: "..(weaponstatus[0]&TELEF_BOOTED?"true\n":"false\n").."boot timer: "..weaponstatus[TELES_BOOTTIMER].."\nsimplified: "..(weaponstatus[0]&TELEF_SIMPLIFIED?"true\n":"false\n"));
+	}
+
+/*
+note to self: do NOT do this
+	override void doeffect(){
+		super.doeffect();
+		A_SetHelpText(); //fuck it
+	}
+*/
+
+	override void initializewepstats(bool idfa){
+		weaponstatus[TELES_BATTERY]=20;
+		if(!idfa){
+			weaponstatus[0]|=TELEF_NOINPUT;
+		}
+	}
+	override void failedpickupunload(){
+		failedpickupunloadmag(TELES_BATTERY,"HDBattery");
+	}
+	override void consolidate(){
+		CheckBFGCharge(TELES_BATTERY);
+	}
+	override double gunmass(){
+		return 3+(weaponstatus[TELES_BATTERY]<0?0:1);
+	}
+	override double weaponbulk(){
+		return 136+(weaponstatus[TELES_BATTERY]>=0?ENC_BATTERY_LOADED:0);
+	}
+	override void DrawHUDStuff(HDStatusBar sb,HDWeapon hdw,HDPlayerPawn hpl){
+		if(sb.hudlevel==1){
+			sb.drawbattery(-54,-4,sb.DI_SCREEN_CENTER_BOTTOM,reloadorder:true);
+			sb.drawnum(hpl.countinv("HDBattery"),-46,-8,sb.DI_SCREEN_CENTER_BOTTOM);
+		}
+		int bat=hdw.weaponstatus[TELES_BATTERY];
+		if(bat>0)sb.drawwepnum(bat,20);
+		else if(!bat)sb.drawstring(
+			sb.mamountfont,"00000",
+			(-16,-9),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+
+if(hdw.weaponstatus[TELES_BOOTTIMER]>0||!(hdw.weaponstatus[0]&TELEF_BOOTED))return;	sb.drawnum(hdw.weaponstatus[TELEV_DESTZ],-23,-30,sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT,Font.CR_BLUE);
+			sb.drawstring(sb.pnewsmallfont, "z", (-17,-30), sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT, Font.CR_BLUE, scale:(0.5,0.5));
+		sb.drawnum(hdw.weaponstatus[TELEV_DESTY],-23,-24,sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT,Font.CR_GREEN);
+			sb.drawstring(sb.pnewsmallfont, "y", (-17,-24), sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT, Font.CR_GREEN, scale:(0.5,0.5));
+			if(hdw.weaponstatus[0]&TELEF_RELATIVE)sb.drawstring(sb.pnewsmallfont, "I", (-13,-24), sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT, Font.CR_WHITE, scale:(0.5,0.5));
+		sb.drawnum(hdw.weaponstatus[TELEV_DESTX],-23,-18,sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT,Font.CR_RED);
+			sb.drawstring(sb.pnewsmallfont, "x", (-17,-18), sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT, Font.CR_RED, scale:(0.5,0.5));
+	}
+	override string,double getpickupsprite(){
+			if(weaponstatus[TELES_BOOTTIMER]>0||!(weaponstatus[0]&TELEF_BOOTED)||weaponstatus[TELES_BATTERY]<1)
+			return "ECTDA0",1.;
+			else return "ECTDB0",1.;
+	}
+
+	//modified A_ZoomAdjust function to delimit the position
+	//Advanced function
+	action void A_DestAdjust(int dest,int button=BT_USER2){
+		if(!pressingfiremode()){
+			setweaponstate("nozoom");
+			return;
+		}
+		if(!(player.cmd.buttons&button)){
+			A_WeaponReady(WRF_NONE);
+			return;
+		}
+		let hdp=hdplayerpawn(self);
+		if(!hdp)return;
+		int inputamt=GetMouseY(true);
+
+		if(inputamt){
+			if(abs(inputamt)<(1<<5))inputamt=clamp(inputamt,-1,1);
+			else inputamt>>=5;
+		}
+		inputamt+=(justpressed(BT_ATTACK)?1:justpressed(BT_ALTATTACK)?-1:0);
+		invoker.weaponstatus[dest]=(invoker.weaponstatus[dest]-inputamt);
+		A_WeaponReady(WRF_NOFIRE);
+		if(invoker.weaponstatus[TELEV_DESTX]==0&&invoker.weaponstatus[TELEV_DESTY]==0&&invoker.weaponstatus[TELEV_DESTZ]==0&&(invoker.weaponstatus[0]&TELEF_RELATIVE))
+		invoker.weaponstatus[0]|=TELEF_NOINPUT;
+		else invoker.weaponstatus[0]&=~TELEF_NOINPUT;
+	}
+
+	//modified from Lambda's rocket launcher
+	//laser guide function.
+	//Simplified function
+	action void A_FindDestination()
+	{
+		If(Health<1)
+		Return;
+		invoker.weaponstatus[0]&=~TELEF_NOINPUT;
+		Double Range=HDCONST_ONEMETRE*35;
+		FTranslatedLineTarget t;
+		double slope = AimLineAttack (angle, range, t);
+		Actor puff = LineAttack (angle, range, slope, 0, 'Normal', "ECTDTeleDestination", LAF_NORANDOMPUFFZ, t);
+		if(puff)
+		{
+			invoker.weaponstatus[TELEV_DESTX]=puff.pos.x;
+			invoker.weaponstatus[TELEV_DESTY]=puff.pos.y;
+			invoker.weaponstatus[TELEV_DESTZ]=puff.pos.z;
+			puff.destroy();
+		}
+	}
+
+	states{
+	fuck:
+		TNT1 A 1 A_SetHelpText();
+		loop;
+	select0:
+		TNT1 A 0 A_Overlay(69,"fuck");
+		TNT1 A 0 A_StartSound("ectd/fumble",CHAN_WEAPON,CHANF_OVERLAP);
+		goto select0bfg;
+	deselect0:
+		TNT1 A 0;
+		goto deselect0bfg;
+	select0bfg:
+		---- A 3 A_JumpIfInventory("NulledWeapon",1,"select1bfg");
+		---- A 0 A_TakeInventory("NulledWeapon");
+		---- A 1 A_Raise();
+		---- A 1 A_Raise(24);
+		---- A 1 A_Raise(18);
+		---- A 1 A_Raise(12);
+		---- AAA 1 A_Raise();
+		---- A 0 A_StartSound("ectd/raise",CHAN_WEAPON,CHANF_OVERLAP);
+		---- A 1 A_Raise(-2);
+		---- AA 1 A_Raise(-1);
+		---- AA 1{
+			A_MuzzleClimb(0.3,0.8);
+			A_Raise(-1);
+		}
+		---- AA 1 A_MuzzleClimb(-0.1,-0.4);
+		---- A 0 A_StartSound("ectd/ready",CHAN_WEAPON,CHANF_OVERLAP);
+		---- AA 1 A_Raise();
+		---- A 1 A_Raise();
+		---- A 1 A_Raise(12);
+		---- A 1 A_Raise(12);
+		wait;
+	deselect0bfg:
+		---- A 0 A_JumpIfHealthLower(1,"deselect1big");
+		---- A 0 A_StartSound("ectd/close",CHAN_WEAPON,CHANF_OVERLAP);
+		---- A 0 A_JumpIfInventory("NulledWeapon",1,"deselect1bfg");
+		---- AA 1 A_Lower(0);
+		---- AA 1 A_Lower();
+		---- A 1 A_Lower(1);
+		---- AA 1 A_Lower(1);
+		---- AA 1{
+			A_MuzzleClimb(0.3,0.8);
+			A_Lower(0);
+		}
+		---- AA 1{
+			A_MuzzleClimb(-0.1,-0.4);
+			A_Lower(2);
+		}
+		---- AAAA 1 A_Lower();
+		---- A 1 A_Lower(12);
+		---- A 1 A_Lower(18);
+		---- A 0 A_StartSound("ectd/fumble",CHAN_WEAPON,CHANF_OVERLAP);
+		---- A 1 A_Lower(18);
+		---- A 1 A_Lower(24);
+		wait;
+	deselect1bfg:
+		---- AA 1 A_Lower(-2);
+		---- A 1 A_Lower(0);
+		---- AAA 1 A_Lower();
+		---- A 1 A_Lower(18);
+		---- A 0 A_StartSound("ectd/fumble",CHAN_WEAPON,CHANF_OVERLAP);
+		---- A 1 A_Lower(18);
+		---- A 1 A_Lower(24);
+		wait;
+	select1bfg:
+		---- A 0 A_TakeInventory("NulledWeapon");
+		---- A 1 A_Raise(36);
+		---- A 1 A_Raise(30);
+		---- A 1 A_Raise(16);
+		---- A 1 A_Raise(12);
+		---- A 1{
+			A_WeaponOffset(0,-6,WOF_ADD);
+			A_MuzzleClimb(-0.1,-1.);
+			A_StartSound("ectd/ready",CHAN_WEAPON,CHANF_OVERLAP);
+		}
+		---- AA 1 A_WeaponOffset(0,2,WOF_ADD);
+		---- A 1 A_Raise(1);
+		wait;
+	ready:
+		TNT1 A 1{
+				A_SetHelpText();
+					//Holding firemode/user2 is the configuration mode.
+					//Prevent accidental teleportations here.
+			if(PressingFireMode()&&invoker.weaponstatus[0]&TELEF_BOOTED&&invoker.weaponstatus[TELES_BOOTTIMER]<1&&invoker.weaponstatus[0]&TELEF_SIMPLIFIED){
+			A_SetHelpText();
+			A_WeaponReady(WRF_ALLOWUSER1|WRF_ALLOWRELOAD|WRF_ALLOWUSER4);
+	    A_FindDestination();
+		  return;
+		}else if(PressingFireMode()&&invoker.weaponstatus[0]&TELEF_BOOTED&&invoker.weaponstatus[TELES_BOOTTIMER]<1){
+			A_SetHelpText();
+			A_WeaponReady(WRF_NONE);
+					//Set the teleport destination to the
+					//player coordinates.
+				if(pressinguse()&&pressingaltreload()&&!(invoker.weaponstatus[0]&TELEF_RELATIVE)){
+			invoker.weaponstatus[TELEV_DESTX] = pos.x;
+			invoker.weaponstatus[TELEV_DESTY] = pos.y;
+			invoker.weaponstatus[TELEV_DESTZ] = pos.z;
+			A_SetHelpText();
+				}
+				else if(pressingaltreload()&&!(invoker.weaponstatus[0]&TELEF_RELATIVE)){
+					//Fetch the user's cvar results and paste
+					//them as the teleport destination.
+			cvar dx = cvar.FindCvar('hd_teledestx');
+			invoker.weaponstatus[TELEV_DESTX] = dx.getint();
+			cvar dy = cvar.FindCvar('hd_teledesty');
+			invoker.weaponstatus[TELEV_DESTY] = dy.getint();
+			A_SetHelpText();
+			cvar dz = cvar.FindCvar('hd_teledestz');
+			invoker.weaponstatus[TELEV_DESTZ] = dz.getint();
+				}
+				if(pressingunload()){
+					//Self explanatory.
+			invoker.weaponstatus[TELEV_DESTX] = 0;
+			invoker.weaponstatus[TELEV_DESTY] = 0;
+			invoker.weaponstatus[TELEV_DESTZ] = 0;
+			A_SetHelpText();
+			invoker.weaponstatus[0]|=TELEF_NOINPUT;
+			}
+					//Basically zoom adjust but for
+
+					//adjusting destination coordinates.
+			A_DestAdjust(TELEV_DESTX,BT_ZOOM);
+			A_DestAdjust(TELEV_DESTY,BT_USER3);
+			A_DestAdjust(TELEV_DESTZ,BT_RELOAD);
+				return;
+			}
+				else A_WeaponReady(WRF_ALL);
+		}goto readyend;
+
+	reload:
+		TNT1 # 0{
+			if(pressinguse()){setweaponstate("boot");return;}
+			int batt=invoker.weaponstatus[TELES_BATTERY];
+			if(
+				batt<0
+				&&countinv("HDBattery")
+			){
+				invoker.weaponstatus[0]&=~TELEF_JUSTUNLOAD;
+				invoker.weaponstatus[0]|=TELEF_LOADCELL;
+				setweaponstate("lowertoopen");
+				return;
+			}
+			setweaponstate("nozoom");
+		}
+	//what key to use for cellunload???
+	unload:
+		TNT1 # 0{
+			//abort if no cell to unload
+			if(invoker.weaponstatus[TELES_BATTERY]<0)
+			setweaponstate("nozoom");else{
+				invoker.weaponstatus[0]|=TELEF_JUSTUNLOAD;
+				invoker.weaponstatus[0]|=TELEF_LOADCELL;
+				//setweaponstate("uncell");
+			}
+		}
+	//lower the weapon, open it, decide what to do
+	lowertoopen:
+		TNT1 # 2 offset(0,36);
+
+		TNT1 # 2 offset(4,38){
+			A_StartSound("weapons/rifleclick2",CHAN_WEAPON,CHANF_OVERLAP);
+		}
+		TNT1 # 6 offset(9,41)A_StartSound("weapons/pocket",CHAN_WEAPON);
+		TNT1 # 8 offset(12,43)A_StartSound("weapons/vulcopen1",CHAN_WEAPON,CHANF_OVERLAP);
+		TNT1 # 5 offset(10,41)A_StartSound("weapons/vulcopen2",CHAN_WEAPON,CHANF_OVERLAP);
+	uncell:
+		TNT1 # 10 offset(11,42){
+			int btt=invoker.weaponstatus[TELES_BATTERY];
+			invoker.weaponstatus[TELES_BATTERY]=-1;
+			if(btt<0)setweaponstate("cellout");
+			else if(
+				!PressingUnload()
+				&&!PressingAltReload()
+				&&!PressingReload()
+			){
+				A_SetTics(4);
+				HDMagAmmo.SpawnMag(self,"HDBattery",btt);
+				
+			}else{
+				A_StartSound("weapons/pocket",CHAN_WEAPON);
+				HDMagAmmo.GiveMag(self,"HDBattery",btt);
+			}
+		}goto cellout;
+
+	cellout:
+		TNT1 # 0 offset(10,40) A_JumpIf(invoker.weaponstatus[0]&TELEF_JUSTUNLOAD,"reloadend");
+	loadcell:
+		TNT1 # 0{
+			let bbb=HDMagAmmo(findinventory("HDBattery"));
+			if(bbb)invoker.weaponstatus[TELES_BATTERY]=bbb.TakeMag(true);
+		}goto reloadend;
+
+	reloadend:
+		TNT1 # 3 offset(9,41);
+		TNT1 # 2 offset(6,38);
+		TNT1 # 3 offset(2,34);
+		goto nozoom;
+
+	altreload:
+		TNT1 A 0{
+				if(invoker.weaponstatus[0]&TELEF_SIMPLIFIED)return;
+				invoker.weaponstatus[0]^=TELEF_RELATIVE;
+				A_SetHelpText();
+				A_StartSound("ectd/toggle",
+					CHAN_WEAPON,CHANF_OVERLAP);
+		}
+		goto nozoom;
+		
+	boot:
+		TNT1 A 0{
+				A_StartSound("ectd/boot",
+					CHAN_WEAPON,CHANF_OVERLAP);
+			if(invoker.weaponstatus[TELES_BATTERY]<1){setweaponstate("nozoom");return;}
+				if(!(invoker.weaponstatus[0]&TELEF_BOOTED))invoker.weaponstatus[TELES_BOOTTIMER]=random(175,350);
+					else invoker.weaponstatus[TELES_BOOTTIMER]=0;
+				invoker.weaponstatus[0]^=TELEF_BOOTED;
+				if(!random(0,16))invoker.weaponstatus[0]|=TELEF_CUEJOKE;
+					else invoker.weaponstatus[0]&=~TELEF_CUEJOKE;
+				A_SetHelpText();
+		}
+		goto nozoom;
+
+			//Grabbed the HDWeapon. Uncommented
+			//the zoom check.
+	nozoom:
+		---- A 1{
+			A_ClearRefire();
+			A_SetHelpText();
+			A_WeaponReady(WRF_NOFIRE);
+			if(invoker.msgtimer>0){
+				invoker.msgtimer--;
+				if(invoker.msgtimer<1)invoker.wepmsg="";
+			}
+			let p=hdplayerpawn(self);
+			if(p){
+				p.lastmisc1>>=1;
+				p.lastmisc2>>=1;
+			}
+		}
+		---- A 0{
+			int inp=getplayerinput(MODINPUT_BUTTONS);
+			if(
+				inp&BT_ATTACK||
+				inp&BT_ALTATTACK||
+				inp&BT_RELOAD||
+				inp&BT_ZOOM||
+				inp&BT_USER1||
+				inp&BT_USER2||
+				inp&BT_USER3||
+				inp&BT_USER4
+			)setweaponstate("nozoom");
+		}
+		---- A 0 A_Jump(256,"ready");
+
+	fire:
+		TNT1 A 0{
+			if(invoker.confirmtimer>0){
+					setweaponstate("teleport");
+					A_StartSound("ectd/boop",
+						CHAN_WEAPON,CHANF_OVERLAP);
+				}else{
+					invoker.confirmtimer=17;
+					A_StartSound("ectd/flicksafety",
+						CHAN_WEAPON,CHANF_OVERLAP);
+				}
+			}
+		goto nozoom;
+	teleport:
+		TNT1 A 0{invoker.confirmtimer=0;}
+		TNT1 A 0{if(invoker.weaponstatus[TELES_BATTERY]<10||invoker.weaponstatus[TELES_BOOTTIMER]>0||!(invoker.weaponstatus[0]&TELEF_BOOTED))setweaponstate("nozoom");}
+		TNT1 A 0{
+				if(invoker.weaponstatus[0]&TELEF_RELATIVE){
+			invoker.finaldest=(pos.x+invoker.weaponstatus[TELEV_DESTX],pos.y+invoker.weaponstatus[TELEV_DESTY],pos.z+invoker.weaponstatus[TELEV_DESTZ]);
+	}else invoker.finaldest=(invoker.weaponstatus[TELEV_DESTX],invoker.weaponstatus[TELEV_DESTY],invoker.weaponstatus[TELEV_DESTZ]);
+
+				if(
+					invoker.weaponstatus[0]&TELEF_NOINPUT
+					||(
+						invoker.weaponstatus[0]&TELEF_RELATIVE
+					&&(
+						invoker.weaponstatus[TELEV_DESTX]==0
+						&&invoker.weaponstatus[TELEV_DESTY]==0
+						&&invoker.weaponstatus[TELEV_DESTZ]==0
+						)
+					)
+				){setweaponstate("nozoom");return;}
+
+			spawn("telefog",pos,ALLOW_REPLACE);
+			//setorigin(invoker.finaldest,false);
+				//Telefrag whoever is in the destination.
+			TeleportMove(invoker.finaldest, true);
+			hdplayerpawn hdp=hdplayerpawn(self);
+			if(hdp)hdp.stunned+=30;
+			spawn("telefog",pos,ALLOW_REPLACE);
+			invoker.weaponstatus[TELES_BATTERY]-=10;
+				if(invoker.weaponstatus[0]&TELEF_RELATIVE||invoker.weaponstatus[0]&TELEF_SIMPLIFIED){
+					invoker.weaponstatus[TELEV_DESTX] = 0;
+					invoker.weaponstatus[TELEV_DESTY] = 0;
+					invoker.weaponstatus[TELEV_DESTZ] = 0;
+					invoker.weaponstatus[0]|=TELEF_NOINPUT;
+				}
+
+						//Currently unused.
+						//https://discord.com/channels/425899670800433153/462331550768431104/1131143865605292092
+		/*
+				if (!CheckMove(pos.xy, PCM_NOACTORS))
+				{
+					// kill
+					DamageMobj(self, self, TELEFRAG_DAMAGE, 'None');
+					return;
+				}
+		*/
+		}
+		goto nozoom;
+
+	spawn:
+		ECTD A 1 NoDelay{
+			invoker.confirmtimer=0;
+			if (target&&invoker.weaponstatus[TELES_BATTERY]>0&&invoker.weaponstatus[TELES_BOOTTIMER]<1&&invoker.weaponstatus[0]&TELEF_BOOTED)
+			{
+				translation = target.translation;
+				frame = 1;
+			}
+		}
+		loop;
+	}
+}
+enum ETCDeviceNums{
+	TELEF_JUSTUNLOAD=1,
+	TELEF_LOADCELL=2,
+	TELEF_RELATIVE=4,
+	TELEF_SIMPLIFIED=8,
+	TELEF_NOINPUT=16,
+	TELEF_BOOTED=32,
+	TELEF_CUEJOKE=64,
+
+	TELES_FLAGS=0,
+	TELES_BATTERY=1,
+	TELES_BOOTTIMER=2,
+
+	TELEV_DESTX=3,
+	TELEV_DESTY=4,
+	TELEV_DESTZ=5,
+}
+
+
+
+
+class ECTDTeleDestination : Actor
+{
+	Default
+	{
+		+NOINTERACTION
+		+FORCEXYBILLBOARD
+		+NOBLOCKMAP
+		+DONTSPLASH
+		+THRUACTORS
+		+NOTRIGGER
+		+PAINLESS
+		+NODAMAGETHRUST
+		+BLOODLESSIMPACT
+		+NOBLOCKMAP
+		+NOBLOCKMONST
+		+NOTONAUTOMAP
+		+CANNOTPUSH
+		+PUFFGETSOWNER
+		+THRUGHOST
+		+PUFFONACTORS
+		Radius 1;
+		Height 1;
+	}
+	States
+	{
+	Spawn:
+		TNT1 A 1;
+		Stop;
+	}
+}
+
+
+
+
+class ECTDRandom:IdleDummy{
+	states{
+	spawn:
+		TNT1 A 0 nodelay{
+			let ggg=ECTDevice(spawn("ECTDevice",pos,ALLOW_REPLACE));
+			if(!ggg)return;
+			HDF.TransferSpecials(self,ggg,HDF.TS_ALL);
+
+			if(!random(0,8)){
+				ggg.weaponstatus[0]|=TELEF_SIMPLIFIED;
+				ggg.weaponstatus[0]|=TELEF_NOINPUT;
+			}
+		}stop;
+	}
+}
+
+class ECTDSimplified:IdleDummy{
+	states{
+	spawn:
+		TNT1 A 0 nodelay{
+			let ggg=ECTDevice(spawn("ECTDevice",pos,ALLOW_REPLACE));
+			if(!ggg)return;
+			HDF.TransferSpecials(self,ggg,HDF.TS_ALL);
+			ggg.weaponstatus[0]|=TELEF_SIMPLIFIED;
+			ggg.weaponstatus[0]|=TELEF_NOINPUT;
+		}stop;
+	}
+}

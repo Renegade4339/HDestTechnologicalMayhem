@@ -1,0 +1,223 @@
+class HDTechnologicalMayhemHandler : EventHandler
+{
+	override void CheckReplacement(ReplaceEvent e)
+	{
+		if(!e.Replacement)
+		{
+			return;
+		}
+
+		switch(e.Replacement.GetClassName())
+		{
+			case 'BFG9K':
+				if(random[m642rand]() <= 18)
+				{
+					e.Replacement = "HDM642Spawner";
+				}
+				break;
+			case 'PortableHealingItemBigger':
+				if(random[medigunrand]() <= 18)
+				{
+					e.Replacement = "HDMedigunSpawner";
+				}
+				break;
+			case 'WildBackpack':
+				if (random[medigunrand]() <= 2)
+				{
+					e.Replacement = "HDMedigunSpawner";
+				}
+				else if (random[m642rand]() <= 12)
+				{
+					e.Replacement = "HDM642Spawner";
+				}
+				break;
+			case 'BlueFrag':
+				if(random[medigunrand]() <= 1)
+				{
+					e.Replacement = "HDUberDevice";
+				}
+				break;
+			case 'CellRandom':
+				if(random[m642rand]() <= 4)
+				{
+					e.Replacement = "M642Battery";
+				}
+				break;
+			case 'CellPackReplacer':
+				if(random[m642rand]() <= 12)
+				{
+					e.Replacement = "M642Battery";
+				}
+				break;
+			case 'RLReplaces':
+				if (random[itemrand]() <= 24)
+				{
+					e.Replacement = "RAINUsable";
+				}
+				break;
+		//they're ridiculously overpowered
+			case 'Hatchling':
+				if(random[dorkrand]() <= 2)
+				{
+					e.Replacement = "EnemyDORK";
+				}
+				break;
+			case 'FlyingSkull':
+				if (random[dorkrand]() <= 2)
+				{
+					e.Replacement = "EnemyDORK";
+				}
+				break;
+		}
+	}
+
+	override void CheckReplacee(ReplacedEvent e)
+	{
+		switch (e.Replacement.GetClassName())
+		{
+			case 'HDMedigunSpawner':
+					e.Replacee = "Berserk";
+					e.Replacee = "Backpack";
+				break;
+			case 'HDUberDevice':
+					e.Replacee = "HealthBonus";
+				break;
+			case 'HDM642Spawner':
+					e.Replacee = "BFG9000";
+					e.Replacee = "Backpack";
+				break;
+			case 'M642Battery':
+					e.Replacee = "Cell";
+					e.Replacee = "CellPack";
+				break;
+			case 'EnemyDORK':
+					e.Replacee = "LostSoul";
+				break;
+		}
+	}
+
+   override void WorldThingSpawned(WorldEvent e)
+	{ 
+		let ammo = HDAmmo(e.Thing);	
+		if(ammo)
+		{		   
+			switch(ammo.GetClassName())
+			{
+				case 'HDBattery':
+					ammo.ItemsThatUseThis.Push("HDMedipack");
+					ammo.ItemsThatUseThis.Push("HDMedipackWorn");
+					ammo.ItemsThatUseThis.Push("RAINUsable");
+					ammo.ItemsThatUseThis.Push("RIFController");
+					ammo.ItemsThatUseThis.Push("DorkUsable");
+					ammo.ItemsThatUseThis.Push("ECTDevice");
+					break;
+				case 'HD_776BeltLink':
+					ammo.ItemsThatUseThis.Push("HDM642Pack");
+					ammo.ItemsThatUseThis.Push("HDM642PackWorn");
+					break;
+				case 'HD6mmFlechetteAmmo':
+					ammo.ItemsThatUseThis.Push("HDM642Pack");
+					ammo.ItemsThatUseThis.Push("HDM642PackWorn");
+					break;
+			}
+		}
+	
+		if(!e.Thing) { return; }
+
+		//actors unaffected by the name change/modded actors
+		string SatanRobo = "SatanRobo";
+		class<HDMobBase> mistercakes = SatanRobo;
+		string HD64Cyberguardian = "HD64Cyberguardian";
+		class<HDMobBase> misterlesscakes = HD64Cyberguardian;
+		string HDImmorpherWarlord = "HDImmorpherWarlord";
+		class<HDMobBase> tarantula = HDImmorpherWarlord;
+		string HD64Autotron = "HD64Autotron";
+		class<HDMobBase> spoodergooner = HD64Autotron;
+
+		//names pre-4.11.3c
+		string Technorantula = "Technorantula";
+		class<HDMobBase> spider = Technorantula;
+		string Technospider = "Technospider";
+		class<HDMobBase> spooder = Technospider;
+		
+		//names post-4.11.3c
+		string Spiderdemon = "Spiderdemon";
+		class<HDMobBase> mommy = Spiderdemon;
+		string Manticore = "Manticore";
+		class<HDMobBase> splooder = Manticore;
+
+		bool bosses = (
+			(mistercakes&&(e.thing.GetClassName() == mistercakes))
+			//goddamn it
+			||(spider&&(e.thing.GetClassName() == spider))
+			||(mommy&&(e.thing.GetClassName() == mommy))
+			//https://youtu.be/LouN4diYiNE
+			||(spooder&&(e.thing.GetClassName() == spooder))
+			||(splooder&&(e.thing.GetClassName() == splooder))
+			//modded actors
+			||(misterlesscakes&&(e.thing.GetClassName() == misterlesscakes))
+			||(tarantula&&(e.thing.GetClassName() == tarantula))
+			||(spoodergooner&&(e.thing.GetClassName() == spoodergooner))
+		);
+
+		if(bosses && !random(0,20)) {
+				let rain=EnemyRAIN(e.thing);
+			let thingy = rain.Spawn("EnemyRAIN",(e.thing.pos.x,e.thing.pos.y,(e.thing.pos.z+e.thing.height)-16),ALLOW_REPLACE);
+			if(thingy)thingy.master=e.thing;
+			}
+
+		if(level.maptime > 1) { return; }
+
+		bool spawnable = (
+			(e.thing.GetClassName() == "ZombieAutoStormtrooper")
+			||(e.thing.GetClassName() == "ZombieSemiStormtrooper")
+			||(e.thing.GetClassName() == "UndeadJackbootman")
+			||(e.thing.GetClassName() == "JackAndJillboot")
+			||(e.thing.GetClassName() == "Jackboot")
+			||(e.thing.GetClassName() == "VulcanetteZombie")
+		);
+
+		if(spawnable && !random(0,28)) {
+				let rain=EnemyRAIN(e.thing);
+			rain.Spawn("EnemyRAIN",(e.thing.pos.x+frandom(-8,8),e.thing.pos.y+frandom(-8,8),e.thing.pos.z),ALLOW_REPLACE);
+			if(rain)rain.isWorn=true;
+			}
+
+		if(e.thing&&(e.Thing is "Inventory" && Inventory(e.Thing).Owner)) { return; }
+
+		bool spawnableectd = (
+			e.thing.GetClassName() == "HDMap");
+
+		if(spawnableectd && !random(0,4)) {
+				let amap=HDMap(e.thing);
+			amap.Spawn("ECTDRandom",(e.thing.pos.x+random(-2,2),e.thing.pos.y+random(-2,2),e.thing.pos.z),ALLOW_REPLACE);
+			}
+	}
+}
+
+
+class HDMedigunSpawner:IdleDummy{
+	override void postbeginplay(){
+		super.postbeginplay();
+		A_SpawnItemEx("HDMedipack",frandom(-3,3),frandom(-3,3),flags:SXF_NOCHECKPOSITION);
+
+		bool _; Actor wep;
+		[_, wep] = A_SpawnItemEx("HDMedigun",1,1,flags:SXF_NOCHECKPOSITION|SXF_TRANSFERSPECIAL);
+		HDF.TransferSpecials(self, wep);
+
+		destroy();
+	}
+}
+
+class HDM642Spawner:IdleDummy{
+	override void postbeginplay(){
+		super.postbeginplay();
+		A_SpawnItemEx("HDM642Pack",frandom(-3,3),frandom(-3,3),flags:SXF_NOCHECKPOSITION);
+
+		bool _; Actor wep;
+		[_, wep] = A_SpawnItemEx("HDM642",1,1,flags:SXF_NOCHECKPOSITION|SXF_TRANSFERSPECIAL);
+		HDF.TransferSpecials(self, wep);
+
+		destroy();
+	}
+}

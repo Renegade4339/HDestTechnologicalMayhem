@@ -1,0 +1,49 @@
+//MEDIGUN
+addmenukey "Call Medic" callmedic
+defaultbind z callmedic
+alias callmedic "say MEDIC!;hd_taunt"
+alias usemedigun "use HDMedigun"
+addmenukey "Equip Medigun" usemedigun
+defaultbind m usemedigun
+
+//DORK
+alias dork "netevent dork %1 %2";
+alias dorka "netevent dork 1 %1";
+alias dorkw "netevent dork 2 %1";
+alias dorkt "netevent dork 3 %1";
+alias dorkp "netevent dork 4 %1";
+alias dorkcome "netevent dork 5 %1";
+alias dorkgo "netevent dork 6 %1";
+alias dorktag "netevent dorktag %1";
+alias dorkcontroller "netevent dork 1024";
+
+alias dorkmvsw "netevent dork 801 %1";
+alias dorkmvs "netevent dork 802 %1";
+alias dorkmvse "netevent dork 803 %1";
+alias dorkmvw "netevent dork 804 %1";
+alias dorkmve "netevent dork 806 %1";
+alias dorkmvnw "netevent dork 807 %1";
+alias dorkmvn "netevent dork 808 %1";
+alias dorkmvne "netevent dork 809 %1";
+
+alias ka "dorka %1";
+alias kw "dorkw %1";
+alias kt "dorkt %1";
+alias kp "dorkp %1";
+alias kcome "dorkcome %1";
+alias kc "dorkcome %1";
+alias kgo "dorkgo %1";
+alias kg "dorkgo %1";
+alias ktag "dorktag %1";
+
+alias kmvsw "netevent dork 801 %1";
+alias kmvs "netevent dork 802 %1";
+alias kmvse "netevent dork 803 %1";
+alias kmvw "netevent dork 804 %1";
+alias kmve "netevent dork 806 %1";
+alias kmvnw "netevent dork 807 %1";
+alias kmvn "netevent dork 808 %1";
+alias kmvne "netevent dork 809 %1";
+
+alias korkpz "dorkcome %1";
+alias ktz "dorka %1";

@@ -1,0 +1,7 @@
+//DORK
+user int dk_dorkmode=4;     //1-4, idle/watch/turret/patrol
+
+//ECTD
+user noarchive int hd_teledestx=0;
+user noarchive int hd_teledesty=0;
+user noarchive int hd_teledestz=0;

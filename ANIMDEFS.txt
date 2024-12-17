@@ -1,0 +1,2 @@
+CanvasTexture HDXCAM_DORKDEST 308 224
+CameraTexture HDXCAM_DORK 308 224

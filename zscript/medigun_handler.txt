@@ -1,0 +1,74 @@
+class MedigunHandler : EventHandler
+{
+	override void CheckReplacement(ReplaceEvent e)
+	{
+		if(!e.Replacement)
+		{
+			return;
+		}
+
+		switch(e.Replacement.GetClassName())
+		{
+			case 'PortableHealingItemBigger':
+				if(random[medigunrand]() <= 18)
+				{
+					e.Replacement = "HDMedigunSpawner";
+				}
+				break;
+			case 'WildBackpack':
+				if (random[medigunrand]() <= 2)
+				{
+					e.Replacement = "HDMedigunSpawner";
+				}
+				break;
+			case 'BlueFrag':
+				if(random[medigunrand]() <= 1)
+				{
+					e.Replacement = "HDUberDevice";
+				}
+				break;
+		}
+	}
+
+	override void CheckReplacee(ReplacedEvent e)
+	{
+		switch (e.Replacement.GetClassName())
+		{
+			case 'HDMedigunSpawner':
+					e.Replacee = "Berserk";
+					e.Replacee = "Backpack";
+				break;
+			case 'HDUberDevice':
+					e.Replacee = "HealthBonus";
+				break;
+		}
+	}
+
+   override void WorldThingSpawned(WorldEvent e)
+	{ 
+		let ammo = HDAmmo(e.Thing);	
+		if(ammo)
+		{		   
+			switch(ammo.GetClassName())
+			{
+				case 'HDBattery':
+					ammo.ItemsThatUseThis.Push("HDMedipack");
+					ammo.ItemsThatUseThis.Push("HDMedipackWorn");
+					break;
+			}
+		}
+	}
+}
+
+class HDMedigunSpawner:IdleDummy{
+	override void postbeginplay(){
+		super.postbeginplay();
+		A_SpawnItemEx("HDMedipack",frandom(-3,3),frandom(-3,3),flags:SXF_NOCHECKPOSITION);
+
+		bool _; Actor wep;
+		[_, wep] = A_SpawnItemEx("HDMedigun",1,1,flags:SXF_NOCHECKPOSITION|SXF_TRANSFERSPECIAL);
+		HDF.TransferSpecials(self, wep);
+
+		destroy();
+	}
+}

@@ -1,0 +1,37 @@
+//Medigun
+Potetobloke - Medipack sprite
+Renegade4339 (me!) - Medigun sprites
+Valve - The two mentioned sprites, and sounds
+
+Medigun beam sprite grabbed from ZionMcCall's Undertale: A Genocide End
+
+
+//M642
+Swampyrad - Ammopack Sprites
+Minigunner - In-hand sprites for the M642.
+(Unknown, grabbed from Bangers and Mash) - Pickup sprite for the M642
+Dizzy - M642 firing sound they grabbed from the internet.
+BloodyAcid - Disposable battery sprites.
+Potetobloke - Mag manager code for the ammo pack (grabbed from the 7mm box mag)
+
+
+//RAIN System
+Rogue Entertainment - Beacon Sprite
+
+
+//RIFC
+Nintendo - RIFC sprite
+V4L_P4L - The idea
+Matt - *ERP hack code
+
+
+//DORK
+Rogue Entertainment - Sentinel sounds and sprites, sprites ripped by Dizzy and sounds grabbed from The Sound Resource.
+Matt - DERP code.
+Phantombeta - Low framerate camera code.
+
+
+//ECTD
+Sterling "Caligari87" Parker - Spawn event handler for the teleporter. Grabbed from Ugly as Sin's LLM module.
+Potetobloke - Short stun idea after teleporting.
+Dizzy - Simplified variant idea.

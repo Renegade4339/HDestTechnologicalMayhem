@@ -1,0 +1,1250 @@
+class HDMedigun:HDWeapon{
+	default{
+		//$Category "Weapons/Hideous Destructor"
+		//$Title "Medigun Rapid Healing Machine"
+		//$Sprite "MDGNA0"
+
+		obituary "$OB_MEDIGUN";
+		scale 0.5;
+		weapon.selectionorder 4096;
+		weapon.slotnumber 9;
+		weapon.slotpriority 256;
+		weapon.kickback 30;
+		weapon.bobrangex 0.3;
+		weapon.bobrangey 0.8;
+		weapon.bobspeed 2.5;
+		weapon.bobstyle "normal";
+		hdweapon.barrelsize 30,3,4;
+		inventory.pickupmessage "$PICKUP_MEDIGUN";
+		hdweapon.refid "mdg";
+		tag "$TAG_MEDIGUN";
+		inventory.icon "MDGNA0";
+		+INVENTORY.INVBAR
+	}
+	override string pickupmessage(){
+		string msg=super.pickupmessage();
+		if(owner&&(owner.findinventory("HDMedipack")||owner.findinventory("HDMedipackWorn")))return msg..Stringtable.Localize("$MEDIGUN_ALLSET");
+		return msg;
+	}
+	override double gunmass(){
+		return 12;
+	}
+	override double weaponbulk(){
+		return 25;
+	}
+	override string,double getpickupsprite(bool usespare){
+		return "MDGNA0",0.5;
+	}
+	override string gethelptext(){
+		return
+		WEPHELP_FIRE..(weaponstatus[MEDIGUNS_MODE]==1?"  Heal patient\n":(weaponstatus[MEDIGUNS_MODE]==2?"  Deploy Übercharge\n":"  Deploy shield\n"))
+		..WEPHELP_ZOOM.." + "..WEPHELP_FIRE..(weaponstatus[MEDIGUNS_MODE]==1?"  Heal self\n":(weaponstatus[MEDIGUNS_MODE]==2?"  Deploy Übercharge on self\n":"  Deploy shield\n"))
+		..WEPHELP_RELOAD.."  Attach/detach a medipack (if worn)\n"
+		..WEPHELP_ALTFIRE.."  Cycle modes"
+		;
+	}
+
+	override void DrawHUDStuff(HDStatusBar sb,HDWeapon hdw,HDPlayerPawn hpl){
+		int medimode=hdw.weaponstatus[MEDIGUNS_MODE];
+		int bffb=hdw.weaponstatus[MEDIGUNS_HEALBATTERY];
+		bool islinked=(hdw.weaponstatus[0]&MEDIGUNF_LINKED);
+		sb.drawstring(sb.pnewsmallfont, (hdw.weaponstatus[MEDIGUNS_MODE]==1?"H":(hdw.weaponstatus[MEDIGUNS_MODE]==2?"Ü":"O")), (-42,-16), sb.DI_SCREEN_CENTER_BOTTOM|sb.DI_TEXT_ALIGN_RIGHT, (islinked?Font.CR_RED:Font.CR_DARKGRAY), scale:(0.5,0.5));
+		if(medimode!=1&&bffb>0)sb.drawstring(
+			sb.mamountfont,"------",
+			(-16,-14),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_RED
+		);
+		else if(bffb>0)sb.drawwepnum(bffb,100,posy:-10);
+		else if(!bffb)sb.drawstring(
+			sb.mamountfont,"000000",
+			(-16,-14),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+		bffb=hdw.weaponstatus[MEDIGUNS_UBERBATTERY];
+		if(medimode!=2&&bffb>0)sb.drawstring(
+			sb.mamountfont,"------",
+			(-16,-7),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_RED
+		);
+		else if(bffb>0)sb.drawwepnum(bffb,100);
+		else if(!bffb)sb.drawstring(
+			sb.mamountfont,"000000",
+			(-16,-7),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+		bffb=hdw.weaponstatus[MEDIGUNS_SHIELDBATTERY];
+		if(medimode!=3&&bffb>0)sb.drawstring(
+			sb.mamountfont,"------",
+			(-16,-21),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_RED
+		);
+		else if(bffb>0)sb.drawwepnum(bffb,100,posy:-15);
+		else if(!bffb)sb.drawstring(
+			sb.mamountfont,"000000",
+			(-16,-21),sb.DI_TEXT_ALIGN_RIGHT|sb.DI_TRANSLATABLE|sb.DI_SCREEN_CENTER_BOTTOM,
+			Font.CR_DARKGRAY
+		);
+	}
+
+	override inventory CreateTossable(int amt){
+		if(!(weaponstatus[0]&MEDIGUNF_LINKED))return super.CreateTossable(amt);
+		if(!HDPlayerPawn.CheckStrip(owner,self)&&(weaponstatus[0]&MEDIGUNF_LINKED))return null;
+
+			HDMediPackWorn pack=HDMediPackWorn(FindInventory("HDMediPackWorn"));
+			if(!pack)return super.CreateTossable(amt);
+		if((weaponstatus[0]&MEDIGUNF_HOLDINGFIRE)){
+		owner.A_StopSound(64);
+		owner.A_StartSound("medigun/release",64,CHANF_OVERLAP);
+		if(weaponstatus[MEDIGUNS_MODE]==3)owner.A_StartSound("medishield/retract",64,CHANF_OVERLAP);
+		pack.holdingfire=false;
+		pack.shielded=false;
+		weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;
+		}
+		//take off the pack when the gun is linked
+		HDMediPack tossed2=HDMediPack(owner.spawn("HDMediPack",
+			(owner.pos.xy,owner.pos.z+owner.height-20),
+			ALLOW_REPLACE
+		));
+		tossed2.weaponstatus[MDPKS_HEALBAT]=pack.healbat;
+		tossed2.weaponstatus[MDPKS_UBERBAT]=pack.uberbat;
+		tossed2.weaponstatus[MDPKS_SHIELDBAT]=pack.shieldbat;
+
+		tossed2.weaponstatus[MDPKS_HEALBATQ]=pack.healbatq;
+		tossed2.weaponstatus[MDPKS_UBERBATQ]=pack.uberbatq;
+		tossed2.weaponstatus[MDPKS_SHIELDBATQ]=pack.shieldbatq;
+
+		tossed2.weaponstatus[MDPKS_UBERBATDMG]=pack.uberbatdmg;
+		if(pack.chargefromuber)tossed2.weaponstatus[0]|=MDPKF_CHARGEFROMUBER;
+		tossed2.amount=1;
+		tossed2.target=owner;
+		HDMediPack.ArmourChangeEffect(owner,90);
+
+			if(weaponstatus[0]&MEDIGUNF_LINKED){
+				HDMedigun tossed=HDMedigun(owner.spawn("HDMedigun",
+			(owner.pos.xy,owner.pos.z+owner.height-32),
+			ALLOW_REPLACE
+		));
+				tossed.weaponstatus[MEDIGUNS_HEALBATTERY]=0;
+				tossed.weaponstatus[MEDIGUNS_UBERBATTERY]=0;
+				tossed.weaponstatus[MEDIGUNS_SHIELDBATTERY]=0;
+				tossed.weaponstatus[MEDIGUNS_UBERDAMAGE]=0;
+				patient=null;
+				tossed.weaponstatus[0]&=~MEDIGUNF_LINKED;
+				tossed.vel=owner.vel+(cos(owner.pitch)*(cos(owner.angle),sin(owner.angle)),-sin(owner.pitch)*13);
+				tossed.angle=owner.angle;
+				tossed.pitch=owner.pitch;
+				destroy();
+		return tossed;
+			}
+		return tossed2;
+	}
+
+	actor patient;
+
+	override void InitializeWepStats(bool idfa){
+		if(deathmatch)weaponstatus[MEDIGUNS_MODE]=MDPK_UBER;
+		else weaponstatus[MEDIGUNS_MODE]=MDPK_HEAL;
+	}
+
+	override void postbeginplay(){
+		super.postbeginplay();
+		if(owner&&owner.FindInventory("HDMedipackWorn"))weaponstatus[0]|=MEDIGUNF_LINKED;
+	}
+
+	states{
+	select0:
+		MDGG A 0 A_Overlay(128,"SyncAmount");
+		goto select0big;
+	deselect0:
+		MDGG A 0{
+		if(!(invoker.weaponstatus[0]&MEDIGUNF_HOLDINGFIRE))return;
+		A_StopSound(64);
+		invoker.patient=null;invoker.weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		if(pack){pack.holdingfire=false;pack.shielded=false;}
+		A_StartSound("medigun/release",64,CHANF_OVERLAP);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==3)A_StartSound("medishield/retract",64,CHANF_OVERLAP);
+		}
+		goto deselect0bfg;
+
+	syncamount:
+		TNT1 A 1{
+			HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(!(invoker.weaponstatus[0]&MEDIGUNF_LINKED)){
+				invoker.weaponstatus[MEDIGUNS_HEALBATTERY]=0;
+				invoker.weaponstatus[MEDIGUNS_UBERBATTERY]=0;
+				invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]=0;
+				invoker.weaponstatus[MEDIGUNS_UBERDAMAGE]=0;
+				invoker.weaponstatus[0]|=MEDIGUNF_JUSTDEPLETED;
+				return;
+			}else if(pack){
+				invoker.weaponstatus[MEDIGUNS_HEALBATTERY]=pack.healbat;
+				invoker.weaponstatus[MEDIGUNS_UBERBATTERY]=pack.uberbat;
+				invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]=pack.shieldbat;
+				invoker.weaponstatus[MEDIGUNS_UBERDAMAGE]=pack.uberbatdmg;
+				}
+			}
+		loop;
+
+	ready:
+		MDGG # 1 A_WeaponReady(WRF_ALL);
+		goto readyend;
+
+	fire:
+		#### A 0 A_JumpIf(pressingzoom(),"healself");
+	reheal:
+		#### A 3 offset(0,32);
+		#### A 3 offset(0,36);
+		#### A 3 offset(0,44);
+		#### A 2 offset(0,52);
+		#### A 2 offset(0,60);
+		#### A 1 offset(0,68);
+		#### A 0 A_Refire("heal");
+		goto fireend;
+	heal:
+		#### A 0{
+			if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]>0)){
+			A_StartSound("medigun/start",64,CHANF_OVERLAP);
+			invoker.weaponstatus[0]|=MEDIGUNF_HOLDINGFIRE;
+			HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(pack)pack.holdingfire=true;
+			}
+			if(invoker.weaponstatus[MEDIGUNS_MODE]==MDPK_UBER&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]>0){
+				A_StartSound("medigun/uberbeam",64,CHANF_OVERLAP);
+				A_StartSound("medigun/uberambience",64,CHANF_OVERLAP|CHANF_LOOP);
+				invoker.weaponstatus[0]|=MEDIGUNF_HOLDINGFIRE;
+				HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(pack)pack.holdingfire=true;
+			}
+			if(invoker.weaponstatus[MEDIGUNS_MODE]==MDPK_SHIELD&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]>0){
+				A_StartSound("medishield/deploy",64,CHANF_OVERLAP);
+				A_StartSound("medishield/loop",64,CHANF_OVERLAP|CHANF_LOOP);
+				invoker.weaponstatus[0]|=MEDIGUNF_HOLDINGFIRE;
+				HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(pack){pack.holdingfire=true;pack.shielded=true;}
+			}
+		}
+	hold:
+		#### A 0{
+		if(invoker.patient&&(distance3d(invoker.patient)>(HDCONST_ONEMETRE*12)||invoker.patient.health<1||!checksight(invoker.patient,SF_IGNOREVISIBILITY|SF_IGNOREWATERBOUNDARY)))invoker.patient=null;
+			else if(!invoker.patient){
+			flinetracedata rlt;
+			LineTrace(
+				angle,HDCONST_ONEMETRE*12,pitch,
+				TRF_ALLACTORS,
+				offsetz:height-6,
+				data:rlt
+			);
+			if(((rlt.hitactor&&rlt.hitactor.bismonster)||(rlt.hitactor&&rlt.hitactor.player))&&rlt.hitactor.health>0)
+			invoker.patient=rlt.hitactor;
+			}
+		}
+		#### A 1 offset(0,68){
+		if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]<1))return;
+		if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]<1)){
+		A_StopSound(64);
+		invoker.patient=null;invoker.weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		if(pack){pack.holdingfire=false;pack.shielded=false;}
+		A_StartSound("medigun/release",69,CHANF_OVERLAP);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==3)A_StartSound("medishield/retract",69,CHANF_OVERLAP);
+		}
+		if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]>0))invoker.weaponstatus[0]&=~MEDIGUNF_JUSTDEPLETED;
+		if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<25)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<25)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]<25)){invoker.weaponstatus[0]|=MEDIGUNF_LOWPOWER;
+		}
+		else{
+		invoker.weaponstatus[0]&=~MEDIGUNF_LOWPOWER;
+		invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		}
+		if((invoker.weaponstatus[0]&MEDIGUNF_LOWPOWER)&&invoker.weaponstatus[MEDIGUNS_MODE]==3){
+		if(!(invoker.weaponstatus[0]&MEDIGUNF_PLAYLOWSOUND)){
+		A_StartSound("medigun/lowpower",64,CHANF_OVERLAP|CHANF_LOOP);
+		invoker.weaponstatus[0]|=MEDIGUNF_PLAYLOWSOUND;
+		}
+		}
+		if((invoker.weaponstatus[0]&MEDIGUNF_LOWPOWER)&&invoker.weaponstatus[MEDIGUNS_MODE]!=3){
+		A_SetTics(random(1,5));
+		if(!(invoker.weaponstatus[0]&MEDIGUNF_PLAYLOWSOUND)){
+		A_StartSound("medigun/lowpower",64,CHANF_OVERLAP|CHANF_LOOP);
+		invoker.weaponstatus[0]|=MEDIGUNF_PLAYLOWSOUND;
+		}
+		}
+		
+		if(invoker.weaponstatus[MEDIGUNS_MODE]!=3){
+		vector3 gpos=pos+gunpos((0,0,-getdefaultbytype("MedigunBeam").height));
+		MedigunBeam ggg=MedigunBeam(spawn("MedigunBeam",gpos,ALLOW_REPLACE));
+
+		let hdp=hdplayerpawn(self);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==2)ggg.uber=true;
+		if(hdp){
+			ggg.angle=hdp.gunangle;
+			ggg.pitch=hdp.gunpitch;
+		}else{
+			ggg.angle=angle;
+			ggg.pitch=pitch;
+		}
+
+		ggg.target=self;ggg.master=self;
+		if(invoker.patient)ggg.tracer=invoker.patient;
+			HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[MEDIGUNS_MODE]==1&&!random(0,64))
+			pack.healbat--;
+			if(invoker.weaponstatus[MEDIGUNS_MODE]==2&&!random(0,48)){
+			pack.uberbat--;
+			if(!random(0,64))pack.uberbatdmg++;
+			}
+			if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]<1)){
+		A_StopSound(64);
+		invoker.patient=null;invoker.weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		if(pack){pack.holdingfire=false;pack.shielded=false;}
+		A_StartSound("medigun/release",69,CHANF_OVERLAP);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==3)A_StartSound("medishield/retract",69,CHANF_OVERLAP);
+		}
+			}else{
+			vector2 atv=angletovector(0,angle+90);
+			actor bbb;
+			[bripper,bbb]=A_SpawnItemEx("medishielddummy",64,flags:SXF_NOCHECKPOSITION);
+			bbb.pitch=pitch;
+			bbb.angle=angle;
+			bbb.master=self;
+			HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[MEDIGUNS_MODE]==3&&!random(0,24))
+			pack.shieldbat--;
+			if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]<1)){
+		A_StopSound(64);
+		invoker.patient=null;invoker.weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		if(pack){pack.holdingfire=false;pack.shielded=false;}
+		A_StartSound("medigun/release",69,CHANF_OVERLAP);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==3)A_StartSound("medishield/retract",69,CHANF_OVERLAP);
+		}
+		}
+		}
+		#### A 0{if(((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]<1))&&!(invoker.weaponstatus[0]&MEDIGUNF_JUSTDEPLETED))A_Refire("haha");else A_Refire();}
+		#### A 0 A_StopSound(64);
+		#### A 0 {invoker.patient=null;invoker.weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		if(pack){pack.holdingfire=false;pack.shielded=false;}
+		}
+		#### A 1 offset(0,68){if(((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]>0))&&!(invoker.weaponstatus[0]&MEDIGUNF_JUSTDEPLETED))A_StartSound("medigun/release",64,CHANF_OVERLAP);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]>0)A_StartSound("medishield/retract",64,CHANF_OVERLAP);
+		}
+	fireend:
+		#### A 1 offset(0,68);
+		#### A 2 offset(0,60);
+		#### A 2 offset(0,52);
+		#### A 3 offset(0,44);
+		#### A 3 offset(0,36);
+		#### A 3 offset(0,32);
+		#### A 0 A_Refire("reheal");
+		goto nope;
+
+	haha:
+		#### A 0{
+		A_StopSound(64);
+		invoker.patient=null;invoker.weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		if(pack){pack.holdingfire=false;pack.shielded=false;}
+		A_StartSound("medigun/release",69,CHANF_OVERLAP);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==3)A_StartSound("medishield/retract",69,CHANF_OVERLAP);
+		invoker.weaponstatus[0]|=MEDIGUNF_JUSTDEPLETED;
+		}
+		goto hold;
+
+	lmao:
+		#### A 0{
+		A_StopSound(64);
+		invoker.patient=null;invoker.weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		if(pack){pack.holdingfire=false;pack.shielded=false;}
+		A_StartSound("medigun/release",69,CHANF_OVERLAP);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==3)A_StartSound("medishield/retract",69,CHANF_OVERLAP);
+		invoker.weaponstatus[0]|=MEDIGUNF_JUSTDEPLETED;
+		}
+		goto vunderbar;
+
+	healself:
+		#### A 0 A_JumpIf(invoker.weaponstatus[MEDIGUNS_MODE]==3,"reheal");
+		#### A 1 offset(0,32);
+		#### A 1 offset(0,36);
+		#### A 1 offset(0,44);
+		#### A 1 offset(0,52);
+		#### A 1 offset(0,60);
+		#### A 1 offset(0,68);
+		#### A 1 offset(0,76);
+		#### A 1 offset(0,84);
+		#### A 1 offset(0,92);
+		#### A 1 offset(0,100);
+		TNT1 A 1;
+		#### A 0 A_Refire("oktoberfest");
+		goto fireend2;
+	oktoberfest:
+		#### A 0{
+			if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]>0)){
+			A_StartSound("medigun/start",64,CHANF_OVERLAP);
+			invoker.weaponstatus[0]|=MEDIGUNF_HOLDINGFIRE;
+			HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(pack)pack.holdingfire=true;
+			}
+			if(invoker.weaponstatus[MEDIGUNS_MODE]==MDPK_UBER&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]>0){
+				A_StartSound("medigun/uberbeam",64,CHANF_OVERLAP);
+				A_StartSound("medigun/uberambience",64,CHANF_OVERLAP|CHANF_LOOP);
+				invoker.weaponstatus[0]|=MEDIGUNF_HOLDINGFIRE;
+				HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(pack)pack.holdingfire=true;
+			}
+		}
+	vunderbar:
+		#### A 0{
+		invoker.patient=self;
+		}
+		#### A 1 offset(0,68){
+		if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<1))return;
+		if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]>0))invoker.weaponstatus[0]&=~MEDIGUNF_JUSTDEPLETED;
+		if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<25)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<25)){invoker.weaponstatus[0]|=MEDIGUNF_LOWPOWER;
+		}
+		else{
+		invoker.weaponstatus[0]&=~MEDIGUNF_LOWPOWER;
+		invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		}
+		if(invoker.weaponstatus[0]&MEDIGUNF_LOWPOWER){
+		A_SetTics(random(1,5));
+		if(!(invoker.weaponstatus[0]&MEDIGUNF_PLAYLOWSOUND)){
+		A_StartSound("medigun/lowpower",64,CHANF_OVERLAP|CHANF_LOOP);
+		invoker.weaponstatus[0]|=MEDIGUNF_PLAYLOWSOUND;
+		}
+		}
+		vector3 gpos=pos+gunpos((0,0,-getdefaultbytype("MedigunBeam").height));
+		MedigunBeam ggg=MedigunBeam(spawn("MedigunBeam",gpos,ALLOW_REPLACE));
+
+		let hdp=hdplayerpawn(self);
+		if(invoker.weaponstatus[MEDIGUNS_MODE]==2)ggg.uber=true;
+		if(hdp){
+			ggg.angle=hdp.gunangle;
+			ggg.pitch=hdp.gunpitch;
+		}else{
+			ggg.angle=angle;
+			ggg.pitch=pitch;
+		}
+
+		ggg.target=self;ggg.master=self;
+		if(invoker.patient)ggg.tracer=invoker.patient;
+			HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[MEDIGUNS_MODE]==1&&!random(0,64))
+			pack.healbat--;
+			if(invoker.weaponstatus[MEDIGUNS_MODE]==2&&!random(0,48)){
+			pack.uberbat--;
+			if(!random(0,64))pack.uberbatdmg++;
+			}
+		}
+		#### A 0{if(((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]<1)||(invoker.weaponstatus[MEDIGUNS_MODE]==3&&invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]<1))&&!(invoker.weaponstatus[0]&MEDIGUNF_JUSTDEPLETED))A_Refire("lmao");else A_Refire("vunderbar");}
+		#### A 0 A_StopSound(64);
+		#### A 0 {invoker.patient=null;invoker.weaponstatus[0]&=~MEDIGUNF_HOLDINGFIRE;invoker.weaponstatus[0]&=~MEDIGUNF_PLAYLOWSOUND;
+		HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+		if(pack)pack.holdingfire=false;
+		}
+		#### A 1 offset(0,68){if((invoker.weaponstatus[MEDIGUNS_MODE]==1&&invoker.weaponstatus[MEDIGUNS_HEALBATTERY]>0)||(invoker.weaponstatus[MEDIGUNS_MODE]==2&&invoker.weaponstatus[MEDIGUNS_UBERBATTERY]>0))A_StartSound("medigun/release",64,CHANF_OVERLAP);}
+	fireend2:
+		#### A 1;
+		MDGG A 1 offset(0,100);
+		#### A 1 offset(0,92);
+		#### A 1 offset(0,84);
+		#### A 1 offset(0,76);
+		#### A 1 offset(0,68);
+		#### A 1 offset(0,60);
+		#### A 1 offset(0,52);
+		#### A 1 offset(0,44);
+		#### A 1 offset(0,36);
+		#### A 1 offset(0,32);
+		#### A 0 A_Refire("healself");
+		goto nope;
+
+	altfire:
+		#### A 1 offset(1,32) A_WeaponBusy();
+		#### A 2 offset(2,32);
+		#### A 1 offset(1,33) A_StartSound("medigun/cycle",8);
+		#### A 2 offset(0,34);
+		#### A 3 offset(-1,35){
+			int mode=invoker.weaponstatus[MEDIGUNS_MODE];
+			if(pressinguse())mode--;else mode++;
+			if(mode<1)mode=MDPK_SHIELD;
+			else if(mode>MDPK_SHIELD)mode=1;
+			invoker.weaponstatus[MEDIGUNS_MODE]=mode;
+			A_SetHelpText();
+		}
+		#### A 4 offset(-1,36);
+		#### A 3 offset(-1,35);
+		#### A 2 offset(0,34);
+		#### A 1;
+		#### A 1 offset(0,34);
+		#### A 1 offset(1,33);
+		goto nope;
+
+	reload:
+		#### # 0{
+				if(
+					!findinventory("HDMediPackWorn")
+				)setweaponstate("nope");
+		}
+		#### # 1 offset(0,34) A_SetCrosshair(21);
+		#### # 1 offset(5,38);
+		#### # 1 offset(10,42);
+		#### # 2 offset(20,46){
+			HDMediPackWorn pack=HDMediPackWorn(FindInventory("HDMediPackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[0]&MEDIGUNF_LINKED)
+			A_StartSound("medigun/close",CHAN_WEAPON,CHANF_OVERLAP);
+			else A_StartSound("medigun/open",CHAN_WEAPON,CHANF_OVERLAP);
+			}
+		#### # 4 offset(30,52){
+			A_MuzzleClimb(0.3,0.4);
+			HDMediPackWorn pack=HDMediPackWorn(FindInventory("HDMediPackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[0]&MEDIGUNF_LINKED)
+			A_StartSound("medipack/secure",CHAN_WEAPON,CHANF_OVERLAP);
+			else A_StartSound("medipack/grabhose",CHAN_WEAPON,CHANF_OVERLAP);
+		}
+		#### # 0{
+			HDMediPackWorn pack=HDMediPackWorn(FindInventory("HDMediPackWorn"));
+			if(!pack)return;
+			A_StartSound("medipack/attachhose",CHAN_WEAPON,CHANF_OVERLAP);
+			}
+		#### ## 7 offset(34,54) A_MuzzleClimb(frandom(0.2,-0.8),frandom(-0.2,0.4));
+		#### # 0{
+			HDMediPackWorn pack=HDMediPackWorn(FindInventory("HDMediPackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[0]&MEDIGUNF_LINKED)
+			A_StartSound("medipack/attachhose",CHAN_WEAPON,CHANF_OVERLAP);
+			}
+		#### # 6 offset(34,54) A_MuzzleClimb(frandom(0.2,-0.8),frandom(-0.2,0.4));
+		#### # 7 offset(34,52) A_MuzzleClimb(frandom(0.2,-0.8),frandom(-0.2,0.4));
+		#### # 10 offset(32,50);
+		#### # 3 offset(32,49){
+			HDMediPackWorn pack=HDMediPackWorn(FindInventory("HDMediPackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[0]&MEDIGUNF_LINKED)
+			A_StartSound("medipack/grabhose",CHAN_WEAPON,CHANF_OVERLAP);
+			else A_StartSound("medipack/secure",CHAN_WEAPON,CHANF_OVERLAP);
+			}
+		#### # 3 offset(30,52);
+		#### # 2 offset(20,46);
+		#### # 1 offset(10,42);
+		#### # 1 offset(5,38);
+		#### # 1 offset(0,34);
+		#### # 2 offset(3,32){
+			A_WeaponBusy();
+			HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[0]&MEDIGUNF_LINKED){
+			invoker.weaponstatus[MEDIGUNS_HEALBATTERY]=0;
+			invoker.weaponstatus[MEDIGUNS_UBERBATTERY]=0;
+			invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]=0;
+			invoker.weaponstatus[MEDIGUNS_UBERDAMAGE]=0;
+			invoker.bdontdisarm=false;
+			}else{
+				invoker.weaponstatus[MEDIGUNS_HEALBATTERY]=pack.healbat;
+				invoker.weaponstatus[MEDIGUNS_UBERBATTERY]=pack.uberbat;
+				invoker.weaponstatus[MEDIGUNS_SHIELDBATTERY]=pack.shieldbat;
+				invoker.weaponstatus[MEDIGUNS_UBERDAMAGE]=pack.uberbatdmg;
+			invoker.bdontdisarm=true;
+			}
+			invoker.weaponstatus[0]^=MEDIGUNF_LINKED;
+		}
+		#### # 3 offset(5,35){
+			HDMedipackWorn pack=HDMedipackWorn(FindInventory("HDMedipackWorn"));
+			if(!pack)return;
+			if(invoker.weaponstatus[0]&MEDIGUNF_LINKED)
+			A_StartSound("medigun/open",CHAN_WEAPON,CHANF_OVERLAP);
+			else A_StartSound("medigun/close",CHAN_WEAPON,CHANF_OVERLAP);
+			}
+		#### # 1 offset(3,32);
+		#### # 1 offset(2,31);
+		goto nope;
+
+	spawn:
+		MDGN A -1;
+		stop;
+	}
+}
+enum medigunstatus{
+	MEDIGUNF_LINKED=1,
+	MEDIGUNF_HOLDINGFIRE=2,
+	MEDIGUNF_LOWPOWER=4,
+	MEDIGUNF_PLAYLOWSOUND=8,
+	MEDIGUNF_JUSTDEPLETED=16,
+
+	MEDIGUNS_FLAGS=0,
+	MEDIGUNS_HEALBATTERY=1,
+	MEDIGUNS_UBERBATTERY=2,
+	MEDIGUNS_SHIELDBATTERY=3,
+
+	MEDIGUNS_UBERDAMAGE=4,
+	MEDIGUNS_MODE=5,
+};
+
+class MedigunBeam : HDActor
+{
+	Default
+	{
+		Radius 8;
+		Height 8;
+		Speed 25;
+		Damage 0;
+		scale 0.25;
+		Projectile;
+		+SEEKERMISSILE
+		+forcexybillboard
+		RenderStyle "Add";
+	}
+	override void postbeginplay(){
+		super.postbeginplay();
+		A_ChangeVelocity(speed*cos(pitch),0,speed*sin(-pitch),CVF_RELATIVE);
+	}
+	bool uber;
+	States
+	{
+	Spawn:
+		MDBM A 1 BRIGHT{
+			A_SeekerMissile(1,90,SMF_PRECISE);
+			A_FadeOut(0.1);
+			if(uber&&!random(0,4))A_CustomRailgun(0,0,"","ff 55 88",
+					RGF_CENTERZ|RGF_SILENT|RGF_FULLBRIGHT,
+					0,50.0,"UberPuff",random(0,359),random(0,359),16,8,0.2,1.0);
+			if(tracer){
+			if(A_JumpIfTargetInLOS("null",360,JLOSF_CHECKTRACER|JLOSF_DEADNOJUMP,60)){
+			if(uber){
+			HDF.Give(tracer,"UberEffect",random(1,8));
+			int blues=tracer.countinv("HealingMagic");
+			bool operated=tracer.findinventory("HDUberDeviceWorn");
+			int zerk=tracer.countinv("HDZerk");
+			if(hd_debug>=7&&(blues>0||zerk>0||operated))console.printf("Deploying Übercharge to "..tracer);
+			else if(hd_debug>=7)console.printf("Attacking "..tracer);
+			if(!(blues>0||zerk>0||operated))
+			tracer.damagemobj(self,target,random(2,8),"Balefire",DMG_NO_PROTECT);
+			destroy();
+			}else{
+			int tracermaxhp=tracer.spawnhealth()*1.5;
+			if(tracer.health<tracermaxhp)tracer.givebody(1);
+			HDF.Give(tracer,"MedigunBeamHeal",1);
+
+			if(hd_debug>=7)console.printf("Administering medical attention to "..tracer);
+			destroy();
+			}
+			}
+			}
+		}
+		Loop;
+	Death:
+		TNT1 A 0;
+		goto spawn;
+	}
+}
+
+class UberPuff:IdleDummy{
+	default{
+		-invisible +forcexybillboard +bloodlessimpact
+		+noblood +alwayspuff -allowparticles +puffonactors +thruactors +nointeraction
+	}
+	states{
+	spawn:
+		TNT1 A 1;
+		stop;
+	}
+}
+
+class MedigunBeamHeal:Inventory{
+default{inventory.maxamount 3;} //maxamount being its strength level
+	override void DoEffect(){
+		if(amount<1)return;
+		int amt=amount;
+		let hdmb=hdmobbase(owner);
+		let hdp=hdplayerpawn(owner);
+		hdbleedingwound targetwound;
+
+		amount--;
+		if(hdmb){
+			if(
+				hdmb.bodydamage>0
+				&&random(0,2)
+			)hdmb.bodydamage--;
+			if(hdmb.stunned>0&&!random(0,16))hdmb.stunned--;
+			}
+		else if(hdp){
+		if(hdp.fatigue<random(1,amt))hdp.fatigue++;
+
+			amount--;
+			if(
+				hdp.oldwoundcount>0
+				&&random(0,2)
+			)hdp.oldwoundcount--;
+			if(
+				hdp.burncount>0
+				&&!random(0,4)
+			){
+			hdp.burncount--;
+			owner.damagemobj(self,self,1,"staples");
+			}
+			if(hdp.incaptimer>0&&!random(0,16))hdp.incaptimer--;
+			}
+
+			let tgw=targetwound;
+			if(
+				!tgw
+				||tgw.bleeder!=owner
+			){
+				tgw=hdbleedingwound.findbiggest(owner);
+				targetwound=tgw;
+			}else if(
+				!tgw.depth
+			){
+				targetwound=null;
+				return;
+			}
+			if(tgw){tgw.patch(frandom(0.1,1.0),true);
+			if(!random(0,32))owner.damagemobj(self,self,1,"staples");
+			}
+	}
+}
+
+class UberEffect:HDDrug{
+	default{inventory.maxamount 225;}
+	bool uberactivated;
+	int tickering;
+	uint ownertranslate;
+
+	override void ownerdied(){
+		super.ownerdied();
+		if(uberactivated){
+			owner.A_StartSound("uber/end",1337);
+			owner.translation=ownertranslate;
+			owner.binvulnerable=false;
+			uberactivated=false;
+		}
+		amount=0;
+		destroy();
+	}
+
+	override void DoEffect(){
+		super.DoEffect();
+		if(amount<1){destroy();return;}
+		int amt=amount;
+		let hdmb=hdmobbase(owner);
+		let hdp=hdplayerpawn(owner);
+
+		tickering++;
+		if(tickering==35){amount-=35;tickering=0;}
+		int damagethreshold;
+		bool uberdeactivated;
+		int blues=owner.countinv("HealingMagic");
+		bool operated=owner.findinventory("HDUberDeviceWorn");
+		int zerk=owner.countinv("HDZerk");
+		if(zerk<HDZerk.HDZERK_COOLOFF)zerk=0;
+		if(amount>=175&&(blues>0||zerk>0||operated)){
+			owner.A_GiveInventory("Ubercharge",1);
+			if(!uberactivated){
+			owner.A_StartSound("uber/start",1337);
+			ownertranslate=owner.translation;
+			owner.A_SetTranslation("Uber");
+			let lighty=spawn("UberLight",owner.pos,ALLOW_REPLACE);
+			if(lighty)lighty.master=owner;
+			}
+			if(!hdp)owner.binvulnerable=true;
+			uberactivated=true;
+		}
+			if(amount<=174&&uberactivated){
+			if(uberactivated){owner.A_StartSound("uber/end",1337);
+			owner.translation=ownertranslate;
+			if(!hdp)owner.binvulnerable=false;
+			uberactivated=false;}
+			}
+		if(hdp){
+			if(blues>0||zerk>0||operated)hdp.beatcap=16;
+			else hdp.beatcap=4;
+		}
+		if(uberactivated||operated)return;
+		damagethreshold=abs(random(10,150)-((blues+zerk)/16));
+		if(blues>0&&!random(0,8))owner.A_TakeInventory("HealingMagic",1);
+		if(zerk>0&&!random(0,4))owner.A_TakeInventory("HDZerk",1);
+		if(hdmb){
+			if(
+				!random(0,15)
+			)hdmb.bodydamage+=damagethreshold;
+			if(hdmb.stunned>0&&!random(0,16))hdmb.stunned++;
+			}
+		else if(hdp){
+			if(
+				!random(0,8)
+			)hdp.burncount+=(blues>0?random(2,4):(zerk>0?random(2,6):random(8,16)));
+			if(
+				!random(0,4)
+			)hdp.aggravateddamage+=(blues>0?random(2,4):(zerk>0?random(2,6):random(8,16)));
+		}
+		if(!random(0,16))damagemobj(self,owner,random(1,10),"slashing",DMG_NO_ARMOR|DMG_FORCED);
+	}
+}
+
+class Ubercharge : PowerInvulnerable
+{
+	Default
+	{
+		Powerup.Duration -1;
+		Powerup.Color "Red";
+		inventory.maxamount 1;
+		translation "0:255=%[0,0,0]:[1.0,0.0,0.0]";
+	}
+	/*
+	Color[256] oldtranslation;
+	override void InitEffect(){
+	super.initeffect();
+	oldtranslation=owner.translation;
+	owner.translation="0:255=%[0,0,0]:[1.0,0.0,0.0]";
+	}
+	override void EndEffect(){
+	super.endeffect();
+	owner.translation=oldtranslation;
+	}
+	*/
+}
+
+class UberLight:IdleDummy{
+	default{
+		+nointeraction +ghost -solid +notimefreeze
+		height 1;
+		radius 1;
+	}
+
+override void tick(){
+	super.tick();
+		if(!master||(master&&!master.binvulnerable)||(master&&!(master.findinventory("Ubercharge")))){destroy();return;}
+			A_Warp(AAPTR_MASTER, 0,0,0, 0,
+			WARPF_NOCHECKPOSITION);
+}
+
+states{
+	spawn:
+		TNT1 A 1 light("UBER");
+		loop;
+ }
+}
+
+class MediShieldDummy:IdleDummy{
+	default{
+		renderstyle "add";
+		alpha 0.5;
+	}
+
+	override void postbeginplay(){
+		super.postbeginplay();
+		A_GiveInventory("ImmunityToFire");
+	}
+
+states{
+	spawn:
+		TNT1 A 1 nodelay{
+			let aaa=spawn("medishieldhitbox",pos);
+			aaa.pitch=pitch;
+			aaa.angle=angle;
+			if(master)aaa.master=master;else aaa.master=self;
+			aaa.tracer=self;
+
+			vector2 atva=angletovector(angle-90,48);
+			let bbb=spawn("medishieldhitbox",(pos.xy+atva,pos.z));
+			bbb.pitch=pitch;
+			bbb.angle=angle;
+			if(master)bbb.master=master;else bbb.master=self;
+			bbb.tracer=self;
+
+			vector2 atvb=angletovector(angle+90,48);
+			let ccc=spawn("medishieldhitbox",(pos.xy+atvb,pos.z));
+			ccc.pitch=pitch;
+			ccc.angle=angle;
+			if(master)ccc.master=master;else ccc.master=self;
+			ccc.tracer=self;
+
+			vector2 atvc=angletovector(angle-120,72);
+			let ddd=spawn("medishieldhitbox",(pos.xy+atva,pos.z));
+			ddd.pitch=pitch;
+			ddd.angle=angle;
+			if(master)bbb.master=master;else ddd.master=self;
+			ddd.tracer=self;
+
+			vector2 atvd=angletovector(angle+120,72);
+			let eee=spawn("medishieldhitbox",(pos.xy+atvb,pos.z));
+			eee.pitch=pitch;
+			eee.angle=angle;
+			if(master)eee.master=master;else eee.master=self;
+			eee.tracer=self;
+		}
+		MDSH A 1 bright light("MEDISHIELD");
+		stop;
+ }
+}
+
+class MedishieldHitbox:HDActor{
+default{
+	Height 100;
+	Radius 24;
+	Mass 100000;
+	+SOLID +SHOOTABLE +NODAMAGE +NOBLOOD +DONTTHRUST
+}
+
+	override void postbeginplay(){
+		super.postbeginplay();
+		A_GiveInventory("ImmunityToFire");
+	}
+
+	States
+	{
+		Spawn:
+		TNT1 A 1;
+			TNT1 A 1 bright{
+		actor bbb;
+		blockthingsiterator it=blockthingsiterator.create(self,8);
+		while(it.next()){
+			bbb=it.thing;
+			if(bbb)target=bbb;
+			if(
+					bbb==self
+					||bbb==master
+					||bbb==tracer
+					||bbb is 'HDPickup'
+					||bbb.bnointeraction
+					||bbb is 'PlayerAntenna'
+					||bbb is 'HDWeapon'
+					//care about the height goddamn it
+					||!A_JumpIfCloser(32,"null")
+					||!CheckSight(bbb, SF_IGNOREVISIBILITY)
+			)continue;
+				if(bbb)A_Immolate(bbb,master,5);
+			}
+		}
+		stop;
+	}
+}
+
+class HDUberDevice : HDWeapon {
+	default {
+		//$Category "Items/Hideous Destructor"
+		//$Title "Ubercharge Tolerance Device"
+		//$Sprite "UTDVA0"
+		+Inventory.INVBAR
+		+weapon.wimpy_weapon
+		+inventory.invbar
+		-hdweapon.droptranslation
+		hdweapon.refid "utd";
+		Tag "$TAG_UBERDEVICE";
+		Inventory.icon "UTDVA0";
+		Inventory.pickupmessage "$PICKUP_UBERDEVICE";
+		Inventory.PickupSound "weapons/pocket";
+		scale 0.6;
+	}
+	override bool AddSpareWeapon(actor newowner){return AddSpareWeaponRegular(newowner);}
+	override hdweapon GetSpareWeapon(actor newowner,bool reverse,bool doselect){return GetSpareWeaponRegular(newowner,reverse,doselect);}
+
+	override double weaponbulk(){
+		return 6;
+	}
+
+	//nicked from the HDWoundFixer actor
+	action void A_TakeOffFirst(
+		string itemtag,
+		int time=100
+	){
+		if(DoHelpText())A_WeaponMessage("Take off your "..itemtag.." first!\n\n(\cdhd_strip\c- in the console\nor hit \cdreload\c-)",time);
+	}
+
+	override void DrawHUDStuff(HDStatusBar sb,HDWeapon hdw,HDPlayerPawn hpl){
+		int ofs=weaponstatus[UTDS_USEOFFS];
+		if(ofs>90)return;
+		let ddd=HDUberDevice(owner.findinventory("HDUberDevice"));
+		if(!ddd||ddd.amount<1)return;
+
+		vector2 bob=hpl.wepbob*0.2;
+		bob.y+=ofs;
+		sb.drawimage("UTDVA0",(0,22)+bob,
+			sb.DI_SCREEN_CENTER|sb.DI_ITEM_CENTER|sb.DI_TRANSLATABLE,
+			alpha:0.5,scale:(2,2)
+		);
+	}
+	override string gethelptext(){
+		return
+		WEPHELP_FIRE.."  Inject device to yourself\n"
+		..WEPHELP_ALTFIRE.."  Use it on someone else\n
+		It's fairly certain your heart can withstand this voltage."
+		;
+	}
+
+	action void A_AddOffset(int ofs){
+		invoker.weaponstatus[UTDS_USEOFFS]+=ofs;
+	}
+
+	States{
+	spawn:
+		UTDV A 1;
+		UTDV A 1{if(invoker.weaponstatus[0]&UTDF_INJECTED)invoker.destroy();}
+		UTDV A -1;
+		stop;
+	select:
+		TNT1 A 0 A_AddOffset(100);
+		goto super::select;
+	ready:
+		TNT1 A 1{
+			int iofs=invoker.weaponstatus[UTDS_USEOFFS];
+			if(iofs>0)invoker.weaponstatus[UTDS_USEOFFS]=iofs*2/3;
+			if(justpressed(BT_ATTACK)){
+				setweaponstate("deploy");
+				return;
+			}
+			if(justpressed(BT_ALTATTACK)){
+				setweaponstate("deploy2");
+				return;
+			}
+			A_WeaponReady(WRF_NOFIRE);
+		}goto readyend;
+	deploy:
+		TNT1 AA 1 A_AddOffset(4);
+		TNT1 AAAA 1 A_AddOffset(9);
+		TNT1 AAAA 1 A_AddOffset(20);
+		TNT1 A 0 A_JumpIf(!pressingfire()&&!pressingaltfire(),"ready");
+		TNT1 A 4 A_StartSound("weapons/pismagclick",CHAN_WEAPON);
+		TNT1 A 2;
+		TNT1 A 1 A_Refire();
+		goto nope;
+	deploy2:
+		TNT1 AA 1 A_AddOffset(4);
+		TNT1 AAAA 1 A_AddOffset(9);
+		TNT1 AAAA 1 A_AddOffset(20);
+		TNT1 A 0 A_JumpIf(!pressingaltfire(),"ready");
+		TNT1 A 4 A_StartSound("weapons/pismagclick",CHAN_WEAPON);
+		TNT1 A 2;
+		TNT1 A 1 A_JumpIf(pressingaltfire(),"injectother");
+		goto nope;
+	hold:
+		TNT1 A 0{
+		HDUberDeviceWorn device=HDUberDeviceWorn(FindInventory("HDUberDeviceWorn"));
+		if(!device||(device&&device.durability<10))return;
+		A_WeaponMessage(Stringtable.Localize("$MESSAGE_HASUTD"),35);
+		setweaponstate("ready");
+		}
+		TNT1 A 1;
+		TNT1 A 0{
+			if(hdplayerpawn(self))hdplayerpawn(self).gunbraced=false;
+			if(invoker.weaponstatus[0]&UTDF_INJECTED){
+				return resolvestate("nope");
+			}
+			let blockinv=HDWoundFixer.CheckCovered(self,CHECKCOV_ONLYFULL);
+			if(blockinv){
+				A_TakeOffFirst(blockinv.gettag(),35);
+				return resolvestate("nope");
+			}
+			if(pitch<55){
+				A_MuzzleClimb(0,8);
+				A_Refire();
+				return resolvestate(null);
+			}
+			return resolvestate("inject");
+		}goto nope;
+	inject:
+		TNT1 A 1{
+			A_SetBlend("7a 3a 18",0.1,4);
+			A_MuzzleClimb(0,2);
+			/*
+			if(hdplayerpawn(self))A_StartSound(hdplayerpawn(self).painsound,CHAN_VOICE);
+			else A_StartSound("*pain",CHAN_VOICE);
+			*/
+			damagemobj(self,self,random(1,8),"slashing",DMG_NO_ARMOR);
+			A_StartSound("uberdevice/inject",CHAN_WEAPON,CHANF_OVERLAP);
+			A_TakeInventory("HDUberDeviceWorn",1);
+			A_GiveInventory("HDUberDeviceWorn",1);
+			invoker.weaponstatus[0]|=UTDF_INJECTED;
+		}
+		TNT1 AAAA 1 A_MuzzleClimb(0,-0.5);
+		TNT1 A 6{
+			if(!(invoker.weaponstatus[0]&UTDF_INJECTED))return;
+			hdweaponselector.select(self,"HDFist",2);
+			DropInventory(invoker);
+			return;
+		}
+		goto nope;
+	injectother:
+		TNT1 A 8{
+			bool helptext=DoHelpText();
+			flinetracedata injectorline;
+			linetrace(
+				angle,42,pitch,
+				offsetz:gunheight()-2,
+				data:injectorline
+			);
+			let c=HDPlayerPawn(injectorline.hitactor);
+			if(!c){
+				actor ccc;
+				if(injectorline.hitactor&&injectorline.hitactor.bismonster)
+				ccc=injectorline.hitactor;
+				if(
+					ccc
+				){
+				HDUberDeviceWorn device=HDUberDeviceWorn(ccc.FindInventory("HDUberDeviceWorn"));
+					if(
+						device&&device.durability>10
+					){
+						if(helptext)A_WeaponMessage(Stringtable.Localize("$MESSAGE_HASUTDOTHERMOB"),35);
+						return resolvestate("nope");
+					}
+					invoker.weaponstatus[0]|=UTDF_INJECTED;
+					ccc.damagemobj(self,self,random(1,8),"slashing",DMG_NO_ARMOR);
+					ccc.A_StartSound("uberdevice/inject",CHAN_WEAPON,CHANF_OVERLAP);
+					ccc.A_TakeInventory("HDUberDeviceWorn",1);
+					ccc.A_GiveInventory("HDUberDeviceWorn",1);
+					return resolvestate("injected");
+				}
+				if(helptext)A_WeaponMessage(Stringtable.Localize("$UBERDEVICE_NOTHINGTOBEDONE"));
+				return resolvestate("nope");
+			}
+			let blockinv=HDWoundFixer.CheckCovered(self,CHECKCOV_ONLYFULL);
+			if(blockinv){
+				if(helptext)A_WeaponMessage(Stringtable.Localize("$STIMPACK_TAKEOFFOTHER")..blockinv.gettag()..Stringtable.Localize("$STIMPACK_ELIPSES"));
+				return resolvestate("nope");
+			}
+			if(IsMoving.Count(c)>4){
+				bool chelptext=DoHelpText(c);
+					if(chelptext)HDWeapon.ForceWeaponMessage(c,string.format(Stringtable.Localize("$UBERDEVICE_STOPSQUIRMING"),player.getusername()));
+					if(helptext)A_WeaponMessage(Stringtable.Localize("$STIMPACK_STAYSTILLOTHER"));
+				return resolvestate("nope");
+			}
+			HDUberDeviceWorn device=HDUberDeviceWorn(c.FindInventory("HDUberDeviceWorn"));
+				if(
+					device&&device.durability>10
+				){
+					if(helptext)A_WeaponMessage(c.gettag()..Stringtable.Localize("$MESSAGE_HASUTDOTHER"),35);
+					return resolvestate("nope");
+				}
+			//and now...
+			invoker.weaponstatus[0]|=UTDF_INJECTED;
+			c.damagemobj(self,self,random(1,8),"slashing",DMG_NO_ARMOR);
+			c.A_StartSound("uberdevice/inject",CHAN_WEAPON,CHANF_OVERLAP);
+			c.A_SetBlend("7a 3a 18",0.1,4);
+			c.A_TakeInventory("HDUberDeviceWorn",1);
+			c.A_GiveInventory("HDUberDeviceWorn",1);
+			return resolvestate("injected");
+		}
+		injected:
+		TNT1 A 8{
+			if(!(invoker.weaponstatus[0]&UTDF_INJECTED))return;
+			hdweaponselector.select(self,"HDFist",2);
+			DropInventory(invoker);
+			return;
+		}
+		goto nope;
+	}
+}
+enum UberDeviceConst{
+	UTDS_USEOFFS=1,
+	UTDF_INJECTED=1,
+}
+
+class HDUberDeviceWorn:HDArmourWorn{
+	default{
+		tag "$TAG_UBERDEVICE";
+		HDDamageHandler.priority 0;
+		HDPickup.wornlayer 0;
+		inventory.MaxAmount 3;
+	}
+
+	override void beginplay(){
+		super.beginplay();
+		durability=100;
+	}
+
+	override void postbeginplay(){
+		super.postbeginplay();
+		durability=100;
+	}
+
+	override void doeffect(){
+		super.doeffect();
+		if(owner.findinventory("UberEffect")&&!random(0,64))durability--;
+		if(durability<1)breakdevice();
+	}
+
+	void BreakDevice()
+	{
+		owner.A_StartSound("uberdevice/break", CHAN_BODY);
+		if(durability<random(1,58)){
+			for(int i=0;i<10;i++){
+				actor aaa=spawn("WallChunk",owner.pos+(0,0,owner.height-24),ALLOW_REPLACE);
+				vector3 offspos=(frandom(-12,12),frandom(-12,12),frandom(-16,4));
+				aaa.setorigin(aaa.pos+offspos,false);
+				aaa.vel=owner.vel+offspos*frandom(0.3,0.6);
+				aaa.scale*=frandom(0.8,2.);
+			}
+		}
+		Destroy();
+	}
+
+	override void DrawHudStuff(
+		hdstatusbar sb,
+		hdplayerpawn hpl,
+		int hdflags,
+		int gzflags
+	){
+		vector2 coords=
+			(hdflags&HDSB_AUTOMAP)?(12,64):
+			(110,-6)
+		;
+
+		sb.drawbar(
+			"UTDVA0","UTDVA0",
+			durability,100,
+			coords,-1,sb.SHADER_VERT,
+			gzflags
+		);
+		sb.drawstring(
+			sb.pnewsmallfont,sb.FormatNumber(durability),
+			coords+(14,-7),gzflags|sb.DI_ITEM_CENTER|sb.DI_TEXT_ALIGN_RIGHT,
+			Font.CR_DARKGRAY,scale:(0.5,0.5)
+		);
+	}
+
+	states{
+	spawn:
+		TNT1 A 0;
+		stop;
+	}
+
+
+
+	//called from HDPlayerPawn and HDMobBase's DamageMobj
+	override int,name,int,double,int,int,int HandleDamage(
+		int damage,
+		name mod,
+		int flags,
+		actor inflictor,
+		actor source,
+		double towound,
+		int toburn,
+
+		int tostun,
+		int tobreak
+	){
+		return damage,mod,flags,towound,toburn,tostun,tobreak;
+	}
+
+	//called from HDBulletActor's OnHitActor
+	override double,double OnBulletImpact(
+		HDBulletActor bullet,
+		double pen,
+		double penshell,
+
+		double hitangle,
+		double deemedwidth,
+		vector3 hitpos,
+		vector3 vu,
+		bool hitactoristall
+	){
+		return pen,penshell;
+	}
+}

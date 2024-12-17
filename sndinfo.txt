@@ -1,0 +1,74 @@
+//MEDIGUN
+
+medigun/start sounds/Medigun/medigun_heal.wav
+medigun/release sounds/Medigun/medigun_heal_detach.wav
+medigun/lowpower sounds/Medigun/medigun_heal_disrupt.wav $volume medigun/lowpower 0.25
+medigun/uberbeam sounds/Medigun/medigun_charged.wav $volume medigun/uberbeam 0.25
+medigun/uberambience sounds/Medigun/crit_power.wav $volume medigun/uberambience 0.45
+
+uber/start sounds/Medigun/invulnerable_on.wav
+uber/end sounds/Medigun/invulnerable_off.wav
+
+medishield/deploy sounds/Medigun/medi_shield_deploy.wav
+medishield/loop sounds/Medigun/medi_burn_lp.wav $volume medishield/loop 0.15
+medishield/retract sounds/Medigun/medi_shield_retract.wav
+
+medigun/cycle sounds/Medigun/flaregun_tube_closefinish.wav
+medigun/open sounds/Medigun/flaregun_boltback.wav
+medipack/grabhose sounds/Medigun/smg_clip_out.wav
+medipack/attachhose sounds/Medigun/bison_reload.wav
+medipack/secure sounds/Medigun/revolver_reload_cylinder_arm.wav
+medigun/close sounds/Medigun/flaregun_boltforward.wav
+
+uberdevice/inject sounds/Medigun/powerup_pickup_agility.wav
+uberdevice/break sounds/Medigun/grappling_hook_impact_default.wav
+
+
+//M642
+
+weapons/m642fire dsm642
+weapons/m642cycle   dsdrpcrl
+weapons/m642packequip dssgcock
+
+
+//RIFC
+
+derp/disabled       dsvulcdn  $pitchset derp/disabled 1.4
+herp/disabled       dsvulcdn  $pitchset herp/disabled 0.8
+rifc/beep         dsitemup  $pitchset rifc/beep 1.5
+
+ied/sabotaged         dsthubm  $pitchset ied/sabotaged 1.5
+ied/sabotaged2         dsflame2  $pitchset ied/sabotaged2 0.65  $volume ied/sabotaged2 0.25
+
+
+//DORK
+
+dork/fly dsfwoosh
+
+dork/hacked       dsvulcup  $pitchset dork/hacked 1.2
+dork/fly2       dsfwoosh  $pitchset dork/fly 1.9
+dork/repair       dsdrpcrl
+dork/repair1      dsthubm
+dork/repair2      dsgopen
+dork/repair3      dsrifclk
+$random dork/repairtry  {dork/repair dork/crawl weapons/pocket dork/repair1 dork/repair2 dork/repair3 weapons/fmswitch weapons/grenopen}
+
+$limit dork/fly 0
+$limit dork/fly2 0
+
+dork/activate sounds/DORK/dork_activate.wav
+dork/acquired sounds/DORK/dork_target.wav
+dork/fire sounds/DORK/dork_fire.wav
+dork/death sounds/DORK/dork_death.wav
+
+
+//ECTD
+
+ectd/boot    dsitemup
+ectd/ready        dsgopen
+ectd/close        dsfclk
+ectd/raise       dssgcock
+ectd/fumble    dspocket
+ectd/flicksafety   dsbarfwd
+ectd/boop   dsswtchx
+ectd/toggle  dsrifck2
