@@ -444,7 +444,7 @@ class RAINUsable:HDWeapon{
 		let worn=HDRAINWorn(FindInventory("HDRAINWorn"));
 		worn.battery1=invoker.weaponstatus[RAINS_WEAPON];
 		worn.battery2=invoker.weaponstatus[RAINS_RADAR];
-		invoker.amount--;
+		//invoker.amount--;
 
 		invoker.WearPackHelpText(self);
 	}
@@ -513,6 +513,7 @@ class RAINUsable:HDWeapon{
 			rain.battery2=invoker.weaponstatus[RAINS_RADAR];
 
 			hdweaponselector.select(self,"HDFist",0);
+			invoker.amount--;
 			}
 		}
 		goto nope;
