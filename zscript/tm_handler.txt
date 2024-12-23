@@ -9,7 +9,7 @@ class HDTechnologicalMayhemHandler : EventHandler
 
 		switch(e.Replacement.GetClassName())
 		{
-			case 'BFG9K':
+			case 'BFGReplaces':
 				if(random[m642rand]() <= 18)
 				{
 					e.Replacement = "HDM642Spawner";

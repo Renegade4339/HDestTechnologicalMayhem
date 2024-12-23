@@ -513,8 +513,8 @@ class RAINUsable:HDWeapon{
 			rain.battery2=invoker.weaponstatus[RAINS_RADAR];
 
 			hdweaponselector.select(self,"HDFist",0);
-			invoker.amount--;
 			}
+			invoker.amount--;
 		}
 		goto nope;
 	unload:

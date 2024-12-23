@@ -590,9 +590,9 @@ class MedigunBeam : HDActor
 {
 	Default
 	{
-		Radius 8;
-		Height 8;
-		Speed 25;
+		Radius 2;
+		Height 2;
+		Speed 12;
 		Damage 0;
 		scale 0.25;
 		Projectile;
@@ -608,14 +608,35 @@ class MedigunBeam : HDActor
 	States
 	{
 	Spawn:
-		MDBM A 1 BRIGHT{
-			A_SeekerMissile(1,90,SMF_PRECISE);
-			A_FadeOut(0.1);
+		TNT1 A 1 BRIGHT{
+			if(tracer&&(tracer==target)){
+			if(uber){
+			HDF.Give(tracer,"UberEffect",random(1,8));
+			int blues=tracer.countinv("HealingMagic");
+			bool operated=tracer.findinventory("HDUberDeviceWorn");
+			int zerk=tracer.countinv("HDZerk");
+			if(hd_debug>=7&&(blues>0||zerk>0||operated))console.printf("Deploying Übercharge to self.");
+			else if(hd_debug>=7)console.printf("Damaging self.");
+			if(!(blues>0||zerk>0||operated))
+			tracer.damagemobj(self,target,random(6,8),"Balefire",DMG_NO_PROTECT);
+			destroy();return;
+			}else{
+			int tracermaxhp=tracer.spawnhealth()*1.5;
+			if(tracer.health<tracermaxhp)tracer.A_GiveInventory("health",1);
+			HDF.Give(tracer,"MedigunBeamHeal",1);
+
+			if(hd_debug>=7)console.printf("Administering medical attention to self.");
+			destroy();return;
+			}
+			}
+			A_SeekerMissile(1,90,SMF_PRECISE|SMF_CURSPEED);
+			A_SpawnParticle("ff 55 55",SPF_FULLBRIGHT,random(2,5),frandom(3,6),angle,frandom(-5,5),frandom(-5,5),frandom(-5,5));
+			A_FadeOut(0.05);
 			if(uber&&!random(0,4))A_CustomRailgun(0,0,"","ff 55 88",
 					RGF_CENTERZ|RGF_SILENT|RGF_FULLBRIGHT,
 					0,50.0,"UberPuff",random(0,359),random(0,359),16,8,0.2,1.0);
 			if(tracer){
-			if(A_JumpIfTargetInLOS("null",360,JLOSF_CHECKTRACER|JLOSF_DEADNOJUMP,60)){
+			if(A_JumpIfTargetInLOS("null",360,JLOSF_CHECKTRACER|JLOSF_DEADNOJUMP,48)){
 			if(uber){
 			HDF.Give(tracer,"UberEffect",random(1,8));
 			int blues=tracer.countinv("HealingMagic");
@@ -628,7 +649,7 @@ class MedigunBeam : HDActor
 			destroy();
 			}else{
 			int tracermaxhp=tracer.spawnhealth()*1.5;
-			if(tracer.health<tracermaxhp)tracer.givebody(1);
+			if(tracer.health<tracermaxhp)tracer.A_GiveInventory("health",1);
 			HDF.Give(tracer,"MedigunBeamHeal",1);
 
 			if(hd_debug>=7)console.printf("Administering medical attention to "..tracer);
